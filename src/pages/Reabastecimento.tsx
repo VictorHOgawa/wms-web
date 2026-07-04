@@ -1,170 +1,113 @@
-import { useState } from 'react'
-import { Zap, Hand, ArrowRight, CheckCircle2 } from 'lucide-react'
-import { useStore } from '../store/useStore'
-import { Badge, Modal, PageHeader, ScanInput } from '../components/ui'
-import OrdemServicoPanel from '../components/OrdemServicoPanel'
-import { cn } from '../lib/utils'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Layers, PackageSearch, Send } from 'lucide-react'
+import {
+  isConnected,
+  wmsApi,
+  type WmsStockPositionDTO,
+  type WmsTarefaArmazemDTO,
+} from '../lib/wmsApi'
+import { Badge, EmptyState, PageHeader, type Tone } from '../components/ui'
+import { num } from '../lib/utils'
 
-interface ReabRow {
-  id: string
-  sku: string
-  desc: string
-  enderecoPicking: string
-  pulmao: string
-  nivel: number
-  minimo: number
-  qtde: number
-  gatilho: 'automatico' | 'sob-demanda'
-}
+const STATUS_TONE: Record<string, Tone> = { AVAILABLE: 'info', COMPLETED: 'ok', DONE: 'ok' }
 
-const SEED: ReabRow[] = [
-  { id: 'R-9005', sku: 'SKU-10243', desc: 'Cabo USB-C 2m', enderecoPicking: 'A-13-01-1', pulmao: 'PUL-A-22', nivel: 12, minimo: 50, qtde: 144, gatilho: 'sob-demanda' },
-  { id: 'R-9008', sku: 'SKU-10241', desc: 'Fone Bluetooth Pulse X', enderecoPicking: 'A-12-03-2', pulmao: 'PUL-A-18', nivel: 84, minimo: 100, qtde: 120, gatilho: 'automatico' },
-  { id: 'R-9011', sku: 'SKU-20055', desc: 'Sérum Vitamina C 30ml', enderecoPicking: 'B-04-12-3', pulmao: 'PUL-B-09', nivel: 22, minimo: 60, qtde: 180, gatilho: 'automatico' },
-]
-
+/**
+ * Reabastecimento (base): a torre despacha um abastecimento pulmão → picking; o
+ * coletor (abastecer) executa e move o estoque. O disparo automático por nível
+ * mínimo é o tuning posterior (precisa do Alex).
+ */
 export default function Reabastecimento() {
-  const { toast } = useStore()
-  const [rows, setRows] = useState<(ReabRow & { feito?: boolean })[]>(SEED)
-  const [exec, setExec] = useState<ReabRow | null>(null)
+  const conectado = isConnected()
+  const [posicoes, setPosicoes] = useState<WmsStockPositionDTO[]>([])
+  const [tarefas, setTarefas] = useState<WmsTarefaArmazemDTO[]>([])
+  const [loading, setLoading] = useState(conectado)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const carregar = async () => {
+    try {
+      const [pos, ab] = await Promise.all([wmsApi.stockPositions(), wmsApi.abastecimentos()])
+      setPosicoes(pos)
+      setTarefas(ab)
+    } catch { /* mantém */ } finally { setLoading(false) }
+  }
+  useEffect(() => { if (conectado) carregar() /* eslint-disable-next-line */ }, [conectado])
+
+  const pulmoes = useMemo(
+    () => posicoes.filter((p) => p.addressType === 'PULMAO' && p.status === 'DISPONIVEL' && p.quantity > 0),
+    [posicoes],
+  )
+
+  const gerar = async (pos: WmsStockPositionDTO, picking: string, qtd: number) => {
+    setMsg(null)
+    try {
+      const r = await wmsApi.gerarAbastecimento({ fromPositionId: pos.id, pickingAddressCode: picking, quantity: qtd })
+      setMsg(`Abastecimento ${r.code} gerado — ${qtd} un de ${pos.skuCode} para ${picking}. Cai no coletor.`)
+      await carregar()
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Falha ao gerar abastecimento.') }
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Reabastecimento (Replenishment)"
-        subtitle="Endereço de picking abaixo do mínimo → tarefa gerada → move do pulmão para picking"
-      >
-        <Badge tone="accent" dot>{rows.filter((r) => !r.feito).length} reabastecimentos</Badge>
+      <PageHeader title="Reabastecimento" subtitle="Despacha do pulmão para o picking; o coletor executa e move o estoque">
+        {conectado ? <Badge tone="ok">{num(tarefas.length)} abastecimentos · WMS</Badge> : <Badge tone="warn">modo demo — conecte ao WMS</Badge>}
       </PageHeader>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="card p-4 flex items-start gap-3">
-          <div className="h-9 w-9 rounded-xl bg-primary-50 text-primary grid place-items-center"><Zap className="h-4 w-4" /></div>
-          <div>
-            <p className="font-medium text-brand">Automático</p>
-            <p className="text-sm text-ink-muted">Disparado por nível mínimo no endereço de picking.</p>
-          </div>
+      {msg && <div className="card p-3 text-sm text-ink-soft">{msg}</div>}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="card overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-line text-xs font-semibold uppercase tracking-wide text-ink-muted">Pulmão (reserva) com saldo</div>
+          {pulmoes.length === 0 ? (
+            <EmptyState icon={<PackageSearch className="h-6 w-6" />} title={loading ? 'Carregando…' : 'Nenhuma posição de pulmão'} text="Guarde estoque em endereços de PULMÃO para reabastecer o picking." />
+          ) : (
+            <ul>{pulmoes.map((p) => <LinhaPulmao key={p.id} pos={p} onGerar={gerar} />)}</ul>
+          )}
         </div>
-        <div className="card p-4 flex items-start gap-3">
-          <div className="h-9 w-9 rounded-xl bg-accent-50 text-accent grid place-items-center"><Hand className="h-4 w-4" /></div>
-          <div>
-            <p className="font-medium text-brand">Sob demanda</p>
-            <p className="text-sm text-ink-muted">Disparado por picking parcial. Bom WMS faz <em>interleaving</em>.</p>
-          </div>
+
+        <div className="card overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-line text-xs font-semibold uppercase tracking-wide text-ink-muted">Abastecimentos despachados</div>
+          {tarefas.length === 0 ? (
+            <EmptyState icon={<Layers className="h-6 w-6" />} title="Nenhum abastecimento" text="Despache um abastecimento à esquerda; cai no coletor." />
+          ) : (
+            <table className="w-full text-sm">
+              <thead><tr>
+                <th className="th">O.S</th><th className="th">SKU</th><th className="th">Rota</th><th className="th text-right">Qtd</th><th className="th">Status</th>
+              </tr></thead>
+              <tbody>
+                {tarefas.map((t) => (
+                  <tr key={t.eventId} className="row-hover">
+                    <td className="td mono text-xs text-brand">{t.code}</td>
+                    <td className="td mono text-xs">{t.skuCode ?? '—'}</td>
+                    <td className="td text-xs text-ink-soft">{t.fromAddressCode} → {t.suggestedAddressCode}</td>
+                    <td className="td text-right mono">{num(t.quantidade)}</td>
+                    <td className="td"><Badge tone={STATUS_TONE[t.status] ?? 'neutral'} dot>{t.status === 'AVAILABLE' ? 'no coletor' : 'concluído'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-
-      <div className="card p-4 flex items-start gap-3 bg-info-50/40 border-info/10">
-        <Zap className="h-5 w-5 text-info shrink-0 mt-0.5" />
-        <p className="text-sm text-ink-soft">
-          O reabastecimento mantém o endereço de picking acima do mínimo. A OS move saldo do pulmão para
-          o picking com bipagem de origem e destino, gerando movimento interno de estoque.
-        </p>
-      </div>
-
-      <div className="card overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th className="th">Tarefa</th>
-              <th className="th">SKU</th>
-              <th className="th">Nível atual</th>
-              <th className="th">Movimentação</th>
-              <th className="th">Gatilho</th>
-              <th className="th"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="row-hover">
-                <td className="td mono font-medium text-brand">{r.id}</td>
-                <td className="td">
-                  <div className="mono text-xs">{r.sku}</div>
-                  <div className="text-xs text-ink-muted">{r.desc}</div>
-                </td>
-                <td className="td">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-20 rounded-full bg-slate-100 overflow-hidden">
-                      <div className={cn('h-full rounded-full', r.nivel < r.minimo ? 'bg-bad' : 'bg-ok')} style={{ width: `${Math.min(100, (r.nivel / r.minimo) * 100)}%` }} />
-                    </div>
-                    <span className="mono text-xs text-ink-soft">{r.nivel}/{r.minimo}</span>
-                  </div>
-                </td>
-                <td className="td">
-                  <span className="inline-flex items-center gap-1.5 mono text-xs">
-                    {r.pulmao} <ArrowRight className="h-3 w-3 text-ink-muted" /> <span className="text-primary font-medium">{r.enderecoPicking}</span>
-                  </span>
-                  <span className="text-xs text-ink-muted ml-1">· {r.qtde} un</span>
-                </td>
-                <td className="td">
-                  <Badge tone={r.gatilho === 'automatico' ? 'primary' : 'accent'}>
-                    {r.gatilho === 'automatico' ? 'Automático' : 'Sob demanda'}
-                  </Badge>
-                </td>
-                <td className="td text-right">
-                  {r.feito ? (
-                    <Badge tone="ok" dot>Concluído</Badge>
-                  ) : (
-                    <button onClick={() => setExec(r)} className="btn-outline py-1.5 px-3 text-xs">Executar</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <OrdemServicoPanel
-        title="OS de reabastecimento"
-        subtitle="Crie reposições automáticas ou sob demanda para operadores executarem no app."
-        tipos={['reabastecimento']}
-      />
-
-      {exec && (
-        <ReabExec
-          row={exec}
-          onClose={() => setExec(null)}
-          onConcluir={() => {
-            setRows((rs) => rs.map((x) => (x.id === exec.id ? { ...x, feito: true } : x)))
-            toast({ tipo: 'sucesso', titulo: 'Picking reabastecido', texto: `${exec.sku} → ${exec.enderecoPicking}` })
-            setExec(null)
-          }}
-        />
-      )}
     </div>
   )
 }
 
-function ReabExec({ row, onClose, onConcluir }: { row: ReabRow; onClose: () => void; onConcluir: () => void }) {
-  const [origem, setOrigem] = useState(false)
-  const [destino, setDestino] = useState(false)
+function LinhaPulmao({ pos, onGerar }: { pos: WmsStockPositionDTO; onGerar: (p: WmsStockPositionDTO, picking: string, qtd: number) => void }) {
+  const [picking, setPicking] = useState('')
+  const [qtd, setQtd] = useState('')
+  const n = Number(qtd) || 0
   return (
-    <Modal
-      open
-      onClose={onClose}
-      size="sm"
-      title="Executar reabastecimento"
-      subtitle={`${row.desc} · ${row.qtde} un`}
-      footer={
-        <>
-          <button onClick={onClose} className="btn-outline">Cancelar</button>
-          <button onClick={onConcluir} disabled={!origem || !destino} className="btn-primary">Confirmar</button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {!origem ? (
-          <ScanInput expected={row.pulmao} label="1 · Bipe o endereço de origem (pulmão)" onValid={() => setOrigem(true)} />
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-ok rounded-xl bg-ok-50 px-3 py-2"><CheckCircle2 className="h-4 w-4" /> Origem <span className="mono">{row.pulmao}</span></div>
-        )}
-        {origem &&
-          (!destino ? (
-            <ScanInput expected={row.enderecoPicking} label="2 · Bipe o endereço de destino (picking)" onValid={() => setDestino(true)} />
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-ok rounded-xl bg-ok-50 px-3 py-2"><CheckCircle2 className="h-4 w-4" /> Destino <span className="mono">{row.enderecoPicking}</span></div>
-          ))}
+    <li className="px-4 py-2.5 border-b border-line flex flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="flex-1 min-w-[150px]">
+        <div className="mono text-sm text-brand">{pos.skuCode}</div>
+        <div className="text-[11px] text-ink-muted">{pos.addressCode} · {num(pos.quantity)} {pos.unit} disp.</div>
       </div>
-    </Modal>
+      <ArrowRight className="h-4 w-4 text-ink-muted" />
+      <input value={picking} onChange={(e) => setPicking(e.target.value)} placeholder="endereço picking" className="w-32 rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-sm outline-none mono" />
+      <input type="number" value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="qtd" className="w-16 rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-sm outline-none" />
+      <button className="btn-primary text-xs" disabled={!picking.trim() || n <= 0 || n > pos.quantity} onClick={() => onGerar(pos, picking.trim(), n)}>
+        <Send className="h-4 w-4" /> Abastecer
+      </button>
+    </li>
   )
 }
