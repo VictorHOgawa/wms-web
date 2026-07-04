@@ -368,6 +368,17 @@ export interface WmsCubagemGatilhoDTO {
   tratado: boolean
   createdAt: string
 }
+export interface WmsSeparacaoDTO {
+  eventId: string
+  code: string
+  status: string
+  skuCode: string | null
+  skuDescription: string | null
+  quantidade: number
+  fromAddressCode: string | null
+  separado: number | null
+  parcial: boolean | null
+}
 export interface WmsConfrontoChaveDTO {
   chave: string
   temCarga: boolean
@@ -434,6 +445,8 @@ export const wmsApi = {
   confrontoChaves: () => wmsGet<WmsConfrontoChaveDTO[]>('/wms/confronto'),
   confronto: (chave: string) => wmsGet<WmsConfrontoDTO>(`/wms/confronto/${encodeURIComponent(chave)}`),
   registrarConfronto: (dto: Record<string, unknown>) => wmsSend<unknown>('POST', '/wms/confronto', dto),
+  separacoes: () => wmsGet<WmsSeparacaoDTO[]>('/wms/separacoes'),
+  gerarSeparacao: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/separacoes', dto),
   apontamentos: (chave?: string) => wmsGet<WmsApontamentoDTO[]>(`/wms/apontamentos${chave ? `?chave=${encodeURIComponent(chave)}` : ''}`),
   registrarApontamento: (dto: Record<string, unknown>) => wmsSend<WmsApontamentoDTO>('POST', '/wms/apontamentos', dto),
   validarApontamento: (id: string, dto: Record<string, unknown>) => wmsSend<WmsApontamentoDTO>('POST', `/wms/apontamentos/${id}/validar`, dto),

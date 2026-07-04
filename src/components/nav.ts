@@ -63,6 +63,7 @@ export const NAV: NavItem[] = [
   { to: '/reabastecimento', label: 'Reabastecimento', icon: ArrowUpDown, group: 'Estoque' },
 
   { to: '/picking', label: 'Picking', icon: ScanLine, group: 'Outbound' },
+  { to: '/separacao', label: 'Separação (despacho)', icon: ScanLine, group: 'Outbound', badge: 'novo' },
   { to: '/expedicao', label: 'Packing & Expedição', icon: PackageCheck, group: 'Outbound' },
   { to: '/confronto', label: 'Confronto carga × descarga', icon: GitCompareArrows, group: 'Outbound', badge: 'novo' },
   { to: '/cubagem', label: 'Cubagem & custo extra', icon: Scale, group: 'Outbound', badge: 'novo' },

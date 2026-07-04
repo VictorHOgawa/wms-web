@@ -19,6 +19,7 @@ import Pallets from './pages/Pallets'
 import Confronto from './pages/Confronto'
 import Cubagem from './pages/Cubagem'
 import Apontamento from './pages/Apontamento'
+import Separacao from './pages/Separacao'
 import Putaway from './pages/Putaway'
 import CrossDocking from './pages/CrossDocking'
 import Estoque from './pages/Estoque'
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/reabastecimento" element={<Reabastecimento />} />
           <Route path="/picking" element={<Picking />} />
+          <Route path="/separacao" element={<Separacao />} />
           <Route path="/expedicao" element={<Expedicao />} />
           <Route path="/perdas-prevencoes" element={<Navigate to="/perdas-prevencoes/cockpit" replace />} />
           <Route path="/perdas-prevencoes/cockpit" element={<PerdasPrevencoes abaInicial="cockpit" />} />
