@@ -17,6 +17,7 @@ import {
   PackageX,
   QrCode,
   Shuffle,
+  Timer,
   ListTodo,
   Receipt,
   Landmark,
@@ -54,6 +55,7 @@ export const NAV: NavItem[] = [
   { to: '/pallets', label: 'Montagem de Pallets', icon: Layers, group: 'Inbound', badge: 'novo' },
   { to: '/putaway', label: 'Endereçamento', icon: MapPin, group: 'Inbound' },
   { to: '/cross-docking', label: 'Cross-docking', icon: Shuffle, group: 'Inbound' },
+  { to: '/free-time', label: 'Free time (piso)', icon: Timer, group: 'Inbound', badge: 'novo' },
 
   { to: '/estoque', label: 'Estoque', icon: Boxes, group: 'Estoque' },
   { to: '/movimentos', label: 'Movimentos', icon: History, group: 'Estoque', badge: 'novo' },

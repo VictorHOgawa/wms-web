@@ -368,6 +368,19 @@ export interface WmsCubagemGatilhoDTO {
   tratado: boolean
   createdAt: string
 }
+export interface WmsCargaPisoDTO {
+  floorStockId: string
+  fiscalDocumentId: string
+  docType: string
+  unidade: string | null
+  status: string
+  arrivedAt: string
+  volumes: number
+  horasNoPiso: number
+  freeTimeHoras: number
+  estourou: boolean
+  horasRestantes: number
+}
 export interface WmsSeparacaoDTO {
   eventId: string
   code: string
@@ -445,6 +458,7 @@ export const wmsApi = {
   confrontoChaves: () => wmsGet<WmsConfrontoChaveDTO[]>('/wms/confronto'),
   confronto: (chave: string) => wmsGet<WmsConfrontoDTO>(`/wms/confronto/${encodeURIComponent(chave)}`),
   registrarConfronto: (dto: Record<string, unknown>) => wmsSend<unknown>('POST', '/wms/confronto', dto),
+  cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
   separacoes: () => wmsGet<WmsSeparacaoDTO[]>('/wms/separacoes'),
   gerarSeparacao: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/separacoes', dto),
   apontamentos: (chave?: string) => wmsGet<WmsApontamentoDTO[]>(`/wms/apontamentos${chave ? `?chave=${encodeURIComponent(chave)}` : ''}`),
