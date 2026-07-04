@@ -283,6 +283,15 @@ export interface BusinessUnitLiteDTO {
   name: string
   code: string
 }
+/** Armazém real do WMS (para o seletor de CD do header quando conectado). */
+export interface WmsWarehouseLiteDTO {
+  id: string
+  code: string
+  name: string
+  uf: string | null
+  tipo: string
+  mode: string
+}
 
 /** Resultado da importação avulsa de XML (POST /wms/documentos/importar-xml). */
 export interface WmsImportacaoXmlDTO {
@@ -436,5 +445,5 @@ export const wmsApi = {
     wmsSend<WmsDivergenceDTO>('POST', `/wms/divergences/${id}/liberar`, dto),
   checklistExecutions: (flow = 'receber', limit = 200) =>
     wmsGet<WmsChecklistExecutionDTO[]>(`/wms/checklists/executions?flow=${flow}&limit=${limit}`),
-  warehouses: () => wmsGet<unknown[]>('/wms/warehouses'),
+  warehouses: () => wmsGet<WmsWarehouseLiteDTO[]>('/wms/warehouses'),
 }

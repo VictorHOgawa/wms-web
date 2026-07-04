@@ -20,7 +20,7 @@ import type {
 import {
   DEMO_OPERATIONAL_EVENTS,
   DEMO_OPERATIONAL_OCCURRENCES,
-} from '../../../wms-shared-demo'
+} from '../shared-demo'
 import type {
   OperationalEvent,
   OperationalOccurrence,

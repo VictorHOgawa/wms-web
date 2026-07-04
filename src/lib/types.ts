@@ -5,7 +5,7 @@ export type {
   DemoOperationalOccurrence as OperationalOccurrence,
   DemoOccurrenceSeverity as OccurrenceSeverity,
   DemoOccurrenceStatus as OccurrenceStatus,
-} from '../../../wms-shared-demo'
+} from '../shared-demo'
 
 export type StatusEstoque =
   | 'disponivel'

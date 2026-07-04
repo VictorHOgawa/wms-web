@@ -19,7 +19,7 @@ import {
   DEMO_EFFECTIVE_PARAMETERS,
   DEMO_OPERATIONAL_TASKS,
   DEMO_WAREHOUSES,
-} from '../../../wms-shared-demo'
+} from '../shared-demo'
 
 const ETAPAS = [
   { id: 'shadow', nome: 'Shadow operation', progresso: 85, status: 'ok', detalhe: 'Pedidos e tarefas sendo comparados com o sistema legado.' },

@@ -16,7 +16,7 @@ import {
   DEMO_CHECKLIST_TEMPLATES,
   DEMO_OPERATIONAL_TASKS,
   DEMO_RECEBIMENTOS_WEB,
-} from '../../../wms-shared-demo'
+} from '../shared-demo'
 
 const RECEBIMENTO_TESTE_ESPERADO = {
   tarefaId: 'T-9011',

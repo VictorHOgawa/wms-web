@@ -7,7 +7,7 @@ import {
   DEMO_EFFECTIVE_PARAMETERS,
   DEMO_OWNERS,
   DEMO_WAREHOUSES,
-} from '../../../wms-shared-demo'
+} from '../shared-demo'
 
 const grupos = [...new Set(DEMO_EFFECTIVE_PARAMETERS.map((item) => item.grupo))]
 

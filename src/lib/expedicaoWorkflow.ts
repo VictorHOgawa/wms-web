@@ -7,15 +7,15 @@ export {
   avaliarConferenciaExpedicao,
   calcularResumoCargaExpedicao,
   criarRequisicaoBipagemExpedicao,
-} from '../../../wms-shared-demo/expedicao.ts'
+} from '../shared-demo/expedicao.ts'
 
 export type {
   DemoExpeditionLoad as CargaExpedicao,
   DemoExpeditionLoadStatus as StatusCargaExpedicao,
   DemoExpeditionVehicleCondition as CondicaoVeiculo,
   DemoExpeditionVolume as VolumeExpedicao,
-} from '../../../wms-shared-demo/types.ts'
+} from '../shared-demo/types.ts'
 
 export type {
   DemoShipmentChecklist as ChecklistEmbarque,
-} from '../../../wms-shared-demo/expedicao.ts'
+} from '../shared-demo/expedicao.ts'

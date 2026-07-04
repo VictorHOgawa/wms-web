@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Search,
@@ -16,6 +16,36 @@ import { CDS, OWNERS } from '../lib/mock'
 import { useStore } from '../store/useStore'
 import { cn } from '../lib/utils'
 import { Badge } from './ui'
+import { isConnected, wmsApi } from '../lib/wmsApi'
+
+/** CDs do seletor: reais do WMS quando conectado, senão o demo (CDS). */
+function useCdOptions() {
+  const [cds, setCds] = useState<Array<{ id: string; nome: string; sub?: string }>>(
+    CDS.map((c) => ({ id: c.id, nome: c.nome, sub: c.uf })),
+  )
+  const setCd = useStore((s) => s.setCd)
+  const cdId = useStore((s) => s.cdId)
+  useEffect(() => {
+    if (!isConnected()) return
+    let vivo = true
+    wmsApi
+      .warehouses()
+      .then((whs) => {
+        if (!vivo || whs.length === 0) return
+        const reais = whs.map((w) => ({ id: w.id, nome: w.name, sub: w.uf ?? '' }))
+        setCds(reais)
+        if (!reais.some((c) => c.id === cdId)) setCd(reais[0].id)
+      })
+      .catch(() => {
+        /* sem conexão real → segue no demo */
+      })
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return cds
+}
 
 const PERFIL_LABEL = { ecommerce: 'E-commerce', industria: 'Indústria', '3pl': '3PL' }
 
@@ -131,6 +161,7 @@ function Selector({
 
 function Topbar({ onMenu }: { onMenu: () => void }) {
   const { cdId, ownerId, setCd, setOwner, perfil, usuario, logout } = useStore()
+  const cdOptions = useCdOptions()
   const location = useLocation()
   const title = NAV.find((n) => n.to === location.pathname)?.label ?? 'Integra WMS'
   return (
@@ -155,7 +186,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         label="Centro"
         value={cdId}
         onChange={setCd}
-        options={CDS.map((c) => ({ id: c.id, nome: c.nome, sub: c.uf }))}
+        options={cdOptions}
       />
       {perfil === '3pl' && (
         <Selector

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Badge, PageHeader } from '../components/ui'
 import { cn } from '../lib/utils'
-import { DEMO_OPERATIONAL_TASKS } from '../../../wms-shared-demo'
+import { DEMO_OPERATIONAL_TASKS } from '../shared-demo'
 import { useStore } from '../store/useStore'
 import { statusTarefaLabel, tipoTarefaLabel } from '../lib/tarefaMeta'
 

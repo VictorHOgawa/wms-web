@@ -6,6 +6,7 @@ import {
   MapPin,
   Boxes,
   ClipboardCheck,
+  ClipboardList,
   FileSpreadsheet,
   FileUp,
   GitCompareArrows,

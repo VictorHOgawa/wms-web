@@ -3,7 +3,7 @@ import {
   DEMO_ADMIN_BUSINESS_ENDERECOS_SUGESTOES,
   DEMO_ADMIN_BUSINESS_PUTAWAY,
   demoSugerirEnderecoPutaway,
-} from '../../../wms-shared-demo/locations.ts'
+} from '../shared-demo/locations.ts'
 
 export const ADMIN_BUSINESS_PUTAWAY = DEMO_ADMIN_BUSINESS_PUTAWAY
 export const ADMIN_BUSINESS_DOCAS = DEMO_ADMIN_BUSINESS_DOCAS
