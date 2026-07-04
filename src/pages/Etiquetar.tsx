@@ -8,6 +8,7 @@ import {
   type WmsEtiquetaPreviewDTO,
   type WmsEtiquetaLoteDTO,
   type WmsEtiquetaIdentidadeDTO,
+  type WmsEtiquetasDocPreviewDTO,
 } from '../lib/wmsApi'
 import { Badge, EmptyState, PageHeader, type Tone } from '../components/ui'
 import { num } from '../lib/utils'
@@ -100,6 +101,8 @@ export default function Etiquetar() {
       <PageHeader title="Etiquetagem (caixa-mestre)" subtitle="1 etiqueta por caixa mestre + 1 por unidade solta — corrige a contagem por volume">
         {conectado ? <Badge tone="ok">{num(lotes.length)} lotes · WMS</Badge> : <Badge tone="warn">modo demo — conecte ao WMS</Badge>}
       </PageHeader>
+
+      {conectado && <EtiquetarDaNota onEmitted={refetch} />}
 
       {conectado && (
         <div className="card p-4 space-y-4">
@@ -227,6 +230,75 @@ export default function Etiquetar() {
           />
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Etiquetar "da nota" (decisão 21/32): informa o documento importado e o sistema
+ * calcula as etiquetas por SKU com QUANTIDADE AUTOMÁTICA (sem digitar), emitindo
+ * todos os SKUs de uma vez. SKU pendente/não cadastrado fica bloqueado.
+ */
+function EtiquetarDaNota({ onEmitted }: { onEmitted: () => void }) {
+  const [docId, setDocId] = useState('')
+  const [prev, setPrev] = useState<WmsEtiquetasDocPreviewDTO | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const carregar = async () => {
+    setMsg(null); setPrev(null)
+    if (!docId.trim()) return
+    try { setPrev(await wmsApi.etiquetasPreviewDoc(docId.trim())) }
+    catch (e) { setMsg(e instanceof Error ? e.message : 'Documento não encontrado.') }
+  }
+  const emitir = async () => {
+    if (!docId.trim()) return
+    setBusy(true); setMsg(null)
+    try {
+      const r = await wmsApi.emitEtiquetasDoc(docId.trim(), {})
+      setMsg(`${r.lotes} lote(s) emitido(s)${r.ignoradosBloqueados ? ` · ${r.ignoradosBloqueados} SKU(s) bloqueado(s) ignorado(s)` : ''}.`)
+      await carregar(); onEmitted()
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Falha ao emitir.') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1">
+          <label className="text-xs font-medium text-ink-muted">Etiquetar da nota — quantidade automática (fiscalDocumentId)</label>
+          <input value={docId} onChange={(e) => setDocId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') carregar() }} placeholder="id do documento importado" className="mt-1 w-full rounded-xl border border-line bg-surface-sub px-3 py-2 text-sm outline-none mono" />
+        </div>
+        <button className="btn-outline self-end" onClick={carregar} disabled={!docId.trim()}>Carregar</button>
+      </div>
+      {msg && <div className="text-sm text-ink-soft">{msg}</div>}
+      {prev && (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full text-sm">
+              <thead><tr>
+                <th className="th">SKU</th><th className="th text-right">Qtd (un)</th><th className="th text-right">Etiquetas</th><th className="th">Status</th>
+              </tr></thead>
+              <tbody>
+                {prev.linhas.map((l) => (
+                  <tr key={l.skuCode} className="row-hover">
+                    <td className="td mono text-xs text-brand">{l.skuCode}<span className="block text-ink-muted">{l.descricao}</span></td>
+                    <td className="td text-right mono">{num(l.quantidadeUnidades)}</td>
+                    <td className="td text-right mono font-medium">{l.bloqueado ? '—' : num(l.nEtiquetas)}</td>
+                    <td className="td">{l.bloqueado ? <Badge tone="warn">{l.motivo}</Badge> : <Badge tone="ok" dot>ok</Badge>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-soft">Total: <b className="text-ink">{num(prev.totalEtiquetas)}</b> etiqueta(s){prev.temBloqueio ? ' · há SKU bloqueado (resolva na conferência)' : ''}</span>
+            <button className="btn-primary" disabled={busy || prev.totalEtiquetas === 0} onClick={emitir}>
+              <Printer className="h-4 w-4" /> Emitir todas da nota
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

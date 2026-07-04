@@ -330,6 +330,23 @@ export interface WmsEtiquetaIdentidadeDTO {
   palletId: string | null
   status: string
 }
+export interface WmsEtiquetasDocPreviewLinha {
+  skuId?: string
+  skuCode: string
+  descricao: string
+  quantidadeUnidades: number
+  caixas?: number
+  unidadesSoltas?: number
+  nEtiquetas: number
+  bloqueado: boolean
+  motivo: string | null
+}
+export interface WmsEtiquetasDocPreviewDTO {
+  fiscalDocumentId: string
+  linhas: WmsEtiquetasDocPreviewLinha[]
+  totalEtiquetas: number
+  temBloqueio: boolean
+}
 export interface WmsCubagemDTO {
   fiscalDocumentId: string
   notaM3: number
@@ -407,6 +424,10 @@ export const wmsApi = {
     wmsGet<WmsEtiquetaIdentidadeDTO[]>(`/wms/etiquetas/identidades?loteId=${loteId}`),
   cubagem: (fiscalDocumentId: string) =>
     wmsGet<WmsCubagemDTO>(`/wms/documentos/${fiscalDocumentId}/cubagem`),
+  etiquetasPreviewDoc: (fiscalDocumentId: string) =>
+    wmsGet<WmsEtiquetasDocPreviewDTO>(`/wms/documentos/${fiscalDocumentId}/etiquetas-preview`),
+  emitEtiquetasDoc: (fiscalDocumentId: string, dto: Record<string, unknown>) =>
+    wmsSend<{ lotes: number; ignoradosBloqueados: number }>('POST', `/wms/documentos/${fiscalDocumentId}/etiquetas`, dto),
   registrarGatilhoCubagem: (fiscalDocumentId: string) =>
     wmsSend<WmsCubagemGatilhoDTO>('POST', `/wms/documentos/${fiscalDocumentId}/cubagem/gatilho`, {}),
   cubagemGatilhos: () => wmsGet<WmsCubagemGatilhoDTO[]>('/wms/cubagem/gatilhos'),
