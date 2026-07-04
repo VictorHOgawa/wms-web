@@ -472,6 +472,8 @@ export const wmsApi = {
   cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
   abastecimentos: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/abastecimentos'),
   gerarAbastecimento: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/abastecimentos', dto),
+  contagens: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/contagens'),
+  gerarContagem: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/contagens', dto),
   separacoes: () => wmsGet<WmsSeparacaoDTO[]>('/wms/separacoes'),
   gerarSeparacao: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/separacoes', dto),
   apontamentos: (chave?: string) => wmsGet<WmsApontamentoDTO[]>(`/wms/apontamentos${chave ? `?chave=${encodeURIComponent(chave)}` : ''}`),
