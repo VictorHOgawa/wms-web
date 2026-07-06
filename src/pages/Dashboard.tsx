@@ -37,8 +37,9 @@ import { Badge, PageHeader, Progress, type Tone } from '../components/ui'
 import { cn } from '../lib/utils'
 import { calcularEtiquetas, emissaoAutomaticaIso, type ViagemComRecebimento } from '../lib/etiquetas'
 import { skusPendentesDoRecebimento } from '../lib/skuControle'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { TipoTarefa } from '../lib/types'
+import { isConnected, wmsApi } from '../lib/wmsApi'
 
 const tipoTarefaLabel: Record<TipoTarefa, { l: string; tone: Tone }> = {
   recebimento: { l: 'Receb.', tone: 'info' },
@@ -129,6 +130,53 @@ function formatarPercentual(valor: number) {
   return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 }
 
+/**
+ * KPIs REAIS do fluxo da viagem (06/07): chegadas/embarques em andamento,
+ * cargas no piso e divergências abertas — direto do spoke. O resto do
+ * dashboard segue demo até cada bloco ganhar fonte real.
+ */
+function KpisReais() {
+  const conectado = isConnected()
+  const [kpis, setKpis] = useState<{ chegadas: number; embarques: number; piso: number; diverg: number } | null>(null)
+
+  useEffect(() => {
+    if (!conectado) return
+    let vivo = true
+    Promise.all([
+      wmsApi.warehouseOverview('Recebimento em Piso').catch(() => []),
+      wmsApi.warehouseOverview('Carregamento').catch(() => []),
+      wmsApi.cargasEmPiso().catch(() => []),
+      wmsApi.divergences('ABERTA').catch(() => []),
+    ]).then(([rec, car, piso, div]) => {
+      if (!vivo) return
+      const abertas = (l: { status: string }[]) => l.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED').length
+      setKpis({ chegadas: abertas(rec), embarques: abertas(car), piso: piso.length, diverg: div.length })
+    })
+    return () => { vivo = false }
+  }, [conectado])
+
+  if (!conectado || !kpis) return null
+  const cards = [
+    { label: 'Chegadas em andamento', n: kpis.chegadas, to: '/recebimento' },
+    { label: 'Embarques em andamento', n: kpis.embarques, to: '/expedicao' },
+    { label: 'Cargas no piso', n: kpis.piso, to: '/free-time' },
+    { label: 'Divergências abertas', n: kpis.diverg, to: '/divergencias-recebimento' },
+  ]
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {cards.map((c) => (
+        <Link key={c.label} to={c.to} className="card p-3 hover:border-brand transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-semibold">{c.n}</span>
+            <Badge tone="ok" dot>real</Badge>
+          </div>
+          <div className="text-xs text-ink-muted mt-1">{c.label}</div>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { tarefas, usuario, ownerId, recebimentos, estoque, pedidos, skusControle } = useStore()
   const recebimentosFiltrados = useMemo(
@@ -195,7 +243,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`Bom dia, ${usuario.split(' ')[0] || 'Operador'}`}
-        subtitle="Visão operacional do centro de distribuição · 29 mai 2026, 08:42"
+        subtitle={`Visão operacional do centro de distribuição · ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`}
       >
         <Link to="/recebimento" className="btn-outline">
           <Truck className="h-4 w-4" /> Recebimentos
@@ -204,6 +252,8 @@ export default function Dashboard() {
           <PackageCheck className="h-4 w-4" /> Expedição
         </Link>
       </PageHeader>
+
+      <KpisReais />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

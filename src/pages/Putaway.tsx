@@ -195,7 +195,7 @@ export default function Putaway() {
     <div className="space-y-6">
       <PageHeader
         title="Endereçamento / Putaway"
-        subtitle="Pallet montado no recebimento → Sistema sugere destino → Operador transporta → Bipa → Disponível"
+        subtitle="Pallet montado no recebimento → Sistema sugere destino → Operador transporta → Bipa → Disponível (DEMO — dados de exemplo)"
       >
         <Badge tone="info" dot>
           {fila.filter((t) => t.status !== 'feito').length} OS pendentes

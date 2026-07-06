@@ -39,7 +39,7 @@ export default function CrossDocking() {
     <div className="space-y-6">
       <PageHeader
         title="Cross-docking"
-        subtitle="Mercadoria entra e já sai sem ser estocada: o supervisor decide fluxo, OS, doca e exceções."
+        subtitle="Mercadoria entra e já sai sem ser estocada: o supervisor decide fluxo, OS, doca e exceções. (DEMO — dados de exemplo)"
       />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">

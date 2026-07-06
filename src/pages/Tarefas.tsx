@@ -38,7 +38,7 @@ export default function Tarefas() {
     <div className="space-y-6">
       <PageHeader
         title="Fila de Tarefas & Interleaving"
-        subtitle="Fila única priorizada — o sistema decide a próxima tarefa por operador"
+        subtitle="Fila única priorizada — o sistema decide a próxima tarefa por operador (DEMO — dados de exemplo)"
       >
         <Badge tone="primary" dot>{tarefas.filter((t) => t.status !== 'feito').length} na fila</Badge>
       </PageHeader>

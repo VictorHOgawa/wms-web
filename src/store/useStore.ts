@@ -189,12 +189,29 @@ const novoHistoricoSku = (
   alteracoes,
 })
 
+// Sessão de UI persistida: o refresh NÃO pode deslogar a torre (a conexão real
+// com o spoke já persiste em localStorage — `wms.session` do wmsApi; aqui é o
+// flag de UI que faltava persistir).
+const AUTH_KEY = 'wms.ui.auth'
+interface AuthSnapshot {
+  usuario: string
+  perfil: State['perfil']
+  ownerId: string
+}
+const savedAuth: AuthSnapshot | null = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_KEY) ?? 'null')
+  } catch {
+    return null
+  }
+})()
+
 export const useStore = create<State>((set, get) => ({
-  autenticado: false,
-  usuario: '',
-  perfil: 'ecommerce',
+  autenticado: !!savedAuth,
+  usuario: savedAuth?.usuario ?? '',
+  perfil: savedAuth?.perfil ?? 'ecommerce',
   cdId: 'cd-sp',
-  ownerId: 'own-all',
+  ownerId: savedAuth?.ownerId ?? 'own-all',
 
   recebimentos: structuredClone(RECEBIMENTOS),
   estoque: structuredClone(ESTOQUE),
@@ -211,9 +228,19 @@ export const useStore = create<State>((set, get) => ({
   zplPrinterConfig: structuredClone(DEFAULT_ZPL_PRINTER_CONFIG),
   toasts: [],
 
-  login: (perfil, usuario) =>
-    set({ autenticado: true, perfil, usuario, ownerId: perfil === '3pl' ? 'own-all' : 'own-nano' }),
-  logout: () => set({ autenticado: false, usuario: '' }),
+  login: (perfil, usuario) => {
+    const ownerId = perfil === '3pl' ? 'own-all' : 'own-nano'
+    try {
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ usuario, perfil, ownerId }))
+    } catch { /* storage indisponível: segue só em memória */ }
+    set({ autenticado: true, perfil, usuario, ownerId })
+  },
+  logout: () => {
+    try {
+      localStorage.removeItem(AUTH_KEY)
+    } catch { /* ignore */ }
+    set({ autenticado: false, usuario: '' })
+  },
   setCd: (id) => set({ cdId: id }),
   setOwner: (id) => set({ ownerId: id }),
 

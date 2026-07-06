@@ -23,6 +23,7 @@ import Separacao from './pages/Separacao'
 import Putaway from './pages/Putaway'
 import CrossDocking from './pages/CrossDocking'
 import FreeTime from './pages/FreeTime'
+import OsViagem from './pages/OsViagem'
 import Estoque from './pages/Estoque'
 import Movimentos from './pages/Movimentos'
 import ControleSKU from './pages/ControleSKU'
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/putaway" element={<Putaway />} />
           <Route path="/cross-docking" element={<CrossDocking />} />
           <Route path="/free-time" element={<FreeTime />} />
+          <Route path="/os-viagem" element={<OsViagem />} />
           <Route path="/estoque" element={<Estoque />} />
           <Route path="/movimentos" element={<Movimentos />} />
           <Route path="/controle-sku" element={<ControleSKU />} />

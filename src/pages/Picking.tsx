@@ -63,7 +63,7 @@ export default function Picking() {
     <div className="space-y-6">
       <PageHeader
         title="Picking (Separação)"
-        subtitle="Coração do outbound: ondas, viagens TMS, OS de separação e execução prática no mobile."
+        subtitle="Coração do outbound: ondas, viagens TMS, OS de separação e execução prática no mobile. (DEMO — dados de exemplo)"
       >
         <Badge tone="primary" dot>{osPicking.length} OS de picking</Badge>
       </PageHeader>

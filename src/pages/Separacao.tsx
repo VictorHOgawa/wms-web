@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ScanLine, PackageSearch, ArrowRight, Send } from 'lucide-react'
+import { ScanLine, PackageSearch, ArrowRight, Send, Workflow, CheckCircle2, Clock, Circle, Lock, FileText } from 'lucide-react'
 import {
   isConnected,
   wmsApi,
   type WmsSeparacaoDTO,
   type WmsStockPositionDTO,
+  type WarehouseOverviewDTO,
 } from '../lib/wmsApi'
 import { Badge, EmptyState, PageHeader, type Tone } from '../components/ui'
 import { num } from '../lib/utils'
 
 const STATUS_TONE: Record<string, Tone> = { AVAILABLE: 'info', COMPLETED: 'ok', DONE: 'ok' }
+const ESTRATEGIAS = ['FIFO', 'FEFO', 'BATCH', 'ZONE', 'WAVE']
 
 /**
  * Separação / Picking (Fluxo 6): a torre despacha uma separação a partir de uma
@@ -20,17 +22,37 @@ export default function Separacao() {
   const conectado = isConnected()
   const [posicoes, setPosicoes] = useState<WmsStockPositionDTO[]>([])
   const [seps, setSeps] = useState<WmsSeparacaoDTO[]>([])
+  const [osViagem, setOsViagem] = useState<WarehouseOverviewDTO[]>([])
+  const [estrategiaDefault, setEstrategiaDefault] = useState('FIFO')
   const [loading, setLoading] = useState(conectado)
   const [msg, setMsg] = useState<string | null>(null)
 
   const carregar = async () => {
     try {
-      const [pos, sp] = await Promise.all([wmsApi.stockPositions(), wmsApi.separacoes()])
+      const [pos, sp, ov] = await Promise.all([
+        wmsApi.stockPositions(),
+        wmsApi.separacoes(),
+        wmsApi.warehouseOverview('Separação').catch(() => [] as WarehouseOverviewDTO[]),
+      ])
       setPosicoes(pos)
       setSeps(sp)
+      setOsViagem(ov)
     } catch { /* mantém */ } finally { setLoading(false) }
   }
-  useEffect(() => { if (conectado) carregar() /* eslint-disable-next-line */ }, [conectado])
+  useEffect(() => {
+    if (!conectado) return
+    carregar()
+    // Estratégia default vem do PARÂMETRO do admin (estrategia_picking), não de
+    // um select solto (decisão do plano de 06/07).
+    wmsApi
+      .paramValues()
+      .then((ps) => {
+        const p = ps.find((x) => x.chave === 'estrategia_picking' && typeof x.valor === 'string')
+        if (p && ESTRATEGIAS.includes(String(p.valor))) setEstrategiaDefault(String(p.valor))
+      })
+      .catch(() => { /* default FIFO */ })
+    // eslint-disable-next-line
+  }, [conectado])
 
   const pickables = useMemo(
     () => posicoes.filter((p) => p.addressType === 'PICKING' && p.status === 'DISPONIVEL' && p.quantity > 0),
@@ -53,6 +75,27 @@ export default function Separacao() {
       </PageHeader>
 
       {msg && <div className="card p-3 text-sm text-ink-soft">{msg}</div>}
+
+      {/* Separações que NASCEM DA VIAGEM (O.S do blueprint): lista + romaneio. */}
+      {conectado && osViagem.filter((o) => o.status !== 'CANCELLED').length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-line text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Separações da viagem
+          </div>
+          <div className="divide-y divide-line">
+            {osViagem
+              .filter((o) => o.status !== 'CANCELLED')
+              .map((os) => (
+                <SeparacaoViagem
+                  key={os.serviceOrderId}
+                  os={os}
+                  estrategiaDefault={estrategiaDefault}
+                  onDone={(m) => { setMsg(m); void carregar() }}
+                />
+              ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card overflow-hidden">
@@ -95,6 +138,105 @@ export default function Separacao() {
             </table>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** O.S "Separação" da viagem: lista de separação (estratégia) + romaneio. */
+function SeparacaoViagem({
+  os,
+  estrategiaDefault,
+  onDone,
+}: {
+  os: WarehouseOverviewDTO
+  estrategiaDefault: string
+  onDone: (msg: string) => void
+}) {
+  const [estrategia, setEstrategia] = useState(estrategiaDefault)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setEstrategia(estrategiaDefault), [estrategiaDefault])
+
+  const lista = os.eventos.find((e) => e.code === 'RELATLISTASEPARA')
+  const romaneio = os.eventos.find((e) => e.code === 'ROMANEIODOCUMENTO')
+  const romaneioItens = Array.isArray((romaneio?.data as { itens?: unknown[] } | null)?.itens)
+    ? ((romaneio!.data as { itens: unknown[] }).itens.length)
+    : null
+
+  const exec = async (eventId: string, data: Record<string, unknown>, rotulo: string) => {
+    setBusy(true)
+    try {
+      await wmsApi.executeOsEvent(os.serviceOrderId, eventId, data)
+      onDone(`✓ ${rotulo} concluído (${os.code}).`)
+    } catch (e) {
+      onDone(e instanceof Error ? e.message : `Falha em ${rotulo}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <Workflow className="h-4 w-4 text-brand" />
+      <div className="min-w-[180px]">
+        <div className="font-medium">
+          {os.documentos.length
+            ? os.documentos.map((d) => `${d.tipo ?? 'DOC'} ${d.numero ?? '—'}`).join(' · ')
+            : 'Carga da viagem'}
+        </div>
+        <div className="text-xs text-ink-muted">
+          {os.trip ? `viagem ${os.trip.code} · ` : ''}
+          <span className="mono">{os.code}</span>
+        </div>
+      </div>
+
+      {/* passos */}
+      <span className="inline-flex items-center gap-1.5">
+        {lista?.status === 'COMPLETED' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : lista?.status === 'AVAILABLE' ? <Clock className="h-4 w-4 text-amber-500" /> : <Circle className="h-4 w-4 text-ink-muted/40" />}
+        Lista
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        {romaneio?.status === 'COMPLETED' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : romaneio?.status === 'AVAILABLE' ? <Clock className="h-4 w-4 text-amber-500" /> : <Circle className="h-4 w-4 text-ink-muted/40" />}
+        Romaneio{romaneioItens != null ? ` (${romaneioItens} doc)` : ''}
+      </span>
+
+      {os.bloqueada && (
+        <Badge tone="warn"><Lock className="h-3 w-3" /> aguardando{os.bloqueadaPor ? `: ${os.bloqueadaPor}` : ''}</Badge>
+      )}
+
+      <div className="ml-auto flex items-center gap-2">
+        {lista?.status === 'AVAILABLE' && (
+          <>
+            <select
+              value={estrategia}
+              onChange={(e) => setEstrategia(e.target.value)}
+              className="rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-xs outline-none"
+              title="Estratégia de picking (default vem do parâmetro do admin)"
+            >
+              {ESTRATEGIAS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <button
+              className="btn-primary text-xs disabled:opacity-50"
+              disabled={busy || os.bloqueada}
+              onClick={() => exec(lista.eventId, { reportGeneratedAt: new Date().toISOString(), estrategiaPicking: estrategia }, 'Lista de separação')}
+            >
+              Gerar lista
+            </button>
+          </>
+        )}
+        {romaneio?.status === 'AVAILABLE' && (
+          <button
+            className="btn-primary text-xs disabled:opacity-50"
+            disabled={busy || os.bloqueada}
+            onClick={() => exec(romaneio.eventId, {}, 'Romaneio')}
+          >
+            <FileText className="h-3.5 w-3.5 inline -mt-0.5 mr-1" />
+            Gerar romaneio
+          </button>
+        )}
+        {os.status === 'COMPLETED' && <Badge tone="ok">concluída</Badge>}
       </div>
     </div>
   )

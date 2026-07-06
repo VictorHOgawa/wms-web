@@ -444,7 +444,90 @@ export interface WmsApontamentoSugestaoDTO {
   base: { nPallets: number; regra: string }
 }
 
+// --- O.S de armazém da VIAGEM (eventos de torre; mesma fonte do coletor) ---
+export interface WarehouseTaskDTO {
+  serviceOrderId: string
+  serviceOrderCode: string
+  eventId: string
+  eventCode: string
+  eventLabel: string
+  fluxo: string
+  templateName: string | null
+  temOcorrencia?: boolean
+  bloqueada?: boolean
+  bloqueadaPor?: string | null
+  contexto: {
+    itens: Array<{ chave: string | null; numero: string | null; produto: string | null; esperada: number; skuCode?: string }>
+    destinoSugerido?: string | null
+  }
+}
+
+/** Evento (passo) de uma O.S na visão de armazém — timeline completa. */
+export interface OverviewEventoDTO {
+  eventId: string
+  code: string | null
+  label: string | null
+  status: 'PENDING' | 'AVAILABLE' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  executedBy: string | null
+  completedAt: string | null
+  /** `event.data` quando COMPLETED (ex.: linhas da conferência, checklist). */
+  data: Record<string, unknown> | null
+}
+export interface OverviewDocumentoDTO {
+  fiscalDocumentId: string | null
+  tipo: string | null
+  numero: string | null
+  kind: 'pickup' | 'delivery' | string
+  weightKg: number | null
+  volumeM3: number | null
+}
+/** O.S de armazém da viagem com a história completa (GET /service-orders/warehouse-overview). */
+export interface WarehouseOverviewDTO {
+  serviceOrderId: string
+  code: string
+  template: string | null
+  status: string
+  createdAt: string
+  trip: { id: string; code: string; status: string } | null
+  cd: { id: string; name: string } | null
+  documentos: OverviewDocumentoDTO[]
+  eventos: OverviewEventoDTO[]
+  bloqueada: boolean
+  bloqueadaPor: string | null
+  ocorrenciasAbertas: number
+}
+
+export interface WmsDocaDTO {
+  id: string
+  code?: string | null
+  name?: string | null
+  nome?: string | null
+  tipo?: string | null
+}
+
+export interface WmsParamValueDTO {
+  chave: string
+  escopo: string
+  escopoId: string | null
+  valor: unknown
+}
+
 export const wmsApi = {
+  /** Eventos de O.S de armazém (AVAILABLE) por código — a torre executa os passos
+   *  que não são do coletor (pré-aviso, bipagem, lista de separação, romaneio,
+   *  carregamento). Mesma fonte do app (`/service-orders/warehouse-tasks`). */
+  warehouseTasks: (codes: string[]) =>
+    wmsGet<WarehouseTaskDTO[]>(`/service-orders/warehouse-tasks?codes=${codes.join(',')}`),
+  /** Visão do armazém: O.S da viagem com timeline completa (telas de processo). */
+  warehouseOverview: (template?: string) =>
+    wmsGet<WarehouseOverviewDTO[]>(
+      `/service-orders/warehouse-overview${template ? `?template=${encodeURIComponent(template)}` : ''}`,
+    ),
+  docas: () => wmsGet<WmsDocaDTO[]>('/wms/docas'),
+  paramValues: () => wmsGet<WmsParamValueDTO[]>('/wms/param-values'),
+  /** Conclui um evento de O.S (rota genérica de execução). */
+  executeOsEvent: (serviceOrderId: string, eventId: string, data: Record<string, unknown>) =>
+    wmsSend<unknown>('POST', `/service-orders/${serviceOrderId}/events/${eventId}/execute`, { data }),
   stockPositions: () => wmsGet<WmsStockPositionDTO[]>('/wms/stock-positions'),
   businessUnits: () => wmsGet<BusinessUnitLiteDTO[]>('/business-units?onlyCD=true'),
   pallets: (status?: string) => wmsGet<WmsPalletDTO[]>(`/wms/pallets${status ? `?status=${status}` : ''}`),

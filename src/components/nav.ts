@@ -18,7 +18,6 @@ import {
   QrCode,
   Shuffle,
   Timer,
-  ListTodo,
   Receipt,
   Landmark,
   Plug,
@@ -29,6 +28,7 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -79,7 +79,13 @@ export const NAV: NavItem[] = [
   { to: '/perdas-prevencoes/relatorios', label: 'Relatorios P&P', icon: BarChart3, group: 'P&P' },
   { to: '/perdas-prevencoes/configuracoes', label: 'Configuracoes P&P', icon: Settings, group: 'P&P' },
 
-  { to: '/tarefas', label: 'Fila de tarefas', icon: ListTodo, group: 'Operação' },
+  // O.S da Viagem: tela TEMPORÁRIA (visão técnica p/ validação manual) — os
+  // passos agora vivem nas telas de processo (Recebimento/Separação/Expedição);
+  // remover quando a validação das telas de processo terminar.
+  { to: '/os-viagem', label: 'O.S da Viagem', icon: Workflow, group: 'Operação', badge: 'temporária' },
+  // Fila de tarefas (mock) removida do menu em 06/07 (decisão do dono) — a fila
+  // do operador é o coletor; rota /tarefas segue acessível por URL.
+  // { to: '/tarefas', label: 'Fila de tarefas', icon: ListTodo, group: 'Operação' },
   { to: '/teste', label: 'TESTE', icon: QrCode, group: 'Operação', badge: 'mobile' },
   { to: '/ocorrencias', label: 'Ocorrências', icon: ShieldAlert, group: 'Operação', badge: 'P0' },
   // Coletor RF fica fora da sidebar: acesso operacional/mobile, não navegação desktop.

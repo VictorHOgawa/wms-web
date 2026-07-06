@@ -311,7 +311,7 @@ export default function Etiquetagem() {
     <div className="space-y-6">
       <PageHeader
         title="Etiquetagem"
-        subtitle="Viagens com conferência documental aprovada na parte 4 da ordem de execução."
+        subtitle="Viagens com conferência documental aprovada na parte 4 da ordem de execução. (DEMO — dados de exemplo)"
       >
         <Badge tone="ok" dot>{prontas.length} emitidas automaticamente</Badge>
         <Badge tone={bloqueadas ? 'warn' : 'neutral'}>{bloqueadas} bloqueadas</Badge>
