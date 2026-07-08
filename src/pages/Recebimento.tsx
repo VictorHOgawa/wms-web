@@ -103,8 +103,16 @@ export default function Recebimento() {
     setBusy(ev.eventId)
     setMsg(null)
     try {
-      await wmsApi.executeOsEvent(os.serviceOrderId, ev.eventId, data)
-      setMsg(`✓ ${PASSO_LABEL[ev.code ?? ''] ?? ev.label} concluído (${os.code}).`)
+      const res = (await wmsApi.executeOsEvent(os.serviceOrderId, ev.eventId, data)) as {
+        message?: string
+      } | null
+      // A bipagem devolve o resultado do CONFRONTO carga×descarga na mensagem
+      // (bateu / faltando / sobrando) — mostrar o que o handler disse.
+      setMsg(
+        typeof res?.message === 'string' && res.message
+          ? `✓ ${res.message} (${os.code})`
+          : `✓ ${PASSO_LABEL[ev.code ?? ''] ?? ev.label} concluído (${os.code}).`,
+      )
       setBipModal(null)
       carregar()
     } catch (e) {

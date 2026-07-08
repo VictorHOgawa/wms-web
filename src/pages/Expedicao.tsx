@@ -152,6 +152,10 @@ function CardEmbarque({
     : []
   const noks = respostas.filter((r) => r.resultado === 'NOK').length
   const expedidas = (carregamento?.data as { expedidas?: number } | null)?.expedidas
+  // Etiquetas bipadas volume a volume no embarque (abre o confronto da viagem).
+  const clData = checklist?.data as { etiquetasBipadas?: number; etiquetasDesconhecidas?: string[] } | null
+  const etiquetasBipadas = clData?.etiquetasBipadas ?? null
+  const etiquetasDesconhecidas = clData?.etiquetasDesconhecidas?.length ?? 0
 
   return (
     <div className="card overflow-hidden">
@@ -192,6 +196,15 @@ function CardEmbarque({
               : ' — aguardando o operador'}
           </span>
         </div>
+        {etiquetasBipadas != null && (
+          <div className="flex items-center gap-1.5 text-xs text-ink-soft">
+            <Badge tone={etiquetasDesconhecidas > 0 ? 'warn' : 'ok'} dot>
+              {etiquetasBipadas} etiqueta(s) bipada(s) no embarque
+              {etiquetasDesconhecidas > 0 ? ` · ${etiquetasDesconhecidas} fora do cadastro` : ''}
+            </Badge>
+            <span className="text-ink-muted">— confronto abre na descarga do CD destino</span>
+          </div>
+        )}
         {respostas.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {respostas.map((r, i) => (
