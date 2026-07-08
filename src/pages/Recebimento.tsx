@@ -228,6 +228,15 @@ export default function Recebimento() {
                     >
                       {PASSO_LABEL[ev.code ?? ''] ?? ev.label}
                       {ev.code === 'CONFQUANTIDADE' && resumoConf ? ` — ${resumoConf}` : ''}
+                      {ev.status === 'COMPLETED' && (ev.executedByNome || ev.completedAt) ? (
+                        <span className="text-xs text-ink-muted">
+                          {' '}
+                          · {ev.executedByNome ?? 'sistema'}
+                          {ev.completedAt
+                            ? ` · ${new Date(ev.completedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+                            : ''}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                 ))}

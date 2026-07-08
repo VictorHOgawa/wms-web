@@ -30,11 +30,18 @@ export default function FreeTime() {
   useEffect(() => { recarregar() }, [recarregar])
 
   const estouradas = useMemo(() => cargas.filter((c) => c.estourou), [cargas])
+  const transferiveis = useMemo(
+    () => estouradas.filter((c) => c.status === 'AGUARDANDO'),
+    [estouradas],
+  )
+
+  const docLabel = (c: WmsCargaPisoDTO) =>
+    `${c.docType} ${c.docNumero ?? c.fiscalDocumentId.slice(0, 8)}`
 
   const transferir = async (c: WmsCargaPisoDTO) => {
     const ok = window.confirm(
       `Transferir esta carga para a armazenagem?\n\n` +
-      `Documento ${c.docType} · ${c.fiscalDocumentId.slice(0, 8)} — ${c.horasNoPiso}h no piso.\n` +
+      `${docLabel(c)} — ${c.horasNoPiso}h no piso.\n` +
       `Será criada a posição de staging e a(s) tarefa(s) de GUARDAR no coletor. ` +
       `A carga sai do piso do cross-dock.`,
     )
@@ -57,6 +64,38 @@ export default function FreeTime() {
     }
   }
 
+  /** Transfere TODAS as estouradas elegíveis (uma a uma; resume o placar no fim). */
+  const transferirTodas = async () => {
+    const alvo = transferiveis
+    if (alvo.length === 0) return
+    const ok = window.confirm(
+      `Transferir ${alvo.length} carga(s) estourada(s) para a armazenagem?\n\n` +
+      alvo.slice(0, 8).map((c) => `• ${docLabel(c)} (${c.horasNoPiso}h)`).join('\n') +
+      (alvo.length > 8 ? `\n… e mais ${alvo.length - 8}` : ''),
+    )
+    if (!ok) return
+    setTransferindo('__lote__')
+    setAviso(null)
+    let feitas = 0
+    const falhas: string[] = []
+    for (const c of alvo) {
+      try {
+        await wmsApi.transferirArmazenagem(c.floorStockId)
+        feitas++
+      } catch (e) {
+        falhas.push(`${docLabel(c)}: ${e instanceof Error ? e.message : 'falha'}`)
+      }
+    }
+    setAviso({
+      tom: falhas.length === 0 ? 'ok' : 'bad',
+      texto:
+        `${feitas} de ${alvo.length} transferida(s) — tarefas de guardar no coletor.` +
+        (falhas.length ? ` Falharam: ${falhas.join(' | ')}` : ''),
+    })
+    setTransferindo(null)
+    recarregar()
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Free time (cross-dock)" subtitle="Cronômetro das cargas paradas no piso; estourou o free time → transferir para armazenagem (decisão 12)">
@@ -67,7 +106,7 @@ export default function FreeTime() {
         ) : <Badge tone="warn">modo demo — conecte ao WMS</Badge>}
       </PageHeader>
 
-      <div className="card p-3 flex items-center gap-3 text-sm">
+      <div className="card p-3 flex flex-wrap items-center gap-3 text-sm">
         <Timer className="h-4 w-4 text-ink-muted" />
         <span className="text-ink-soft">Free time padrão</span>
         <input
@@ -78,6 +117,18 @@ export default function FreeTime() {
           className="w-20 rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-sm outline-none"
         />
         <span className="text-ink-muted">horas — o contrato do cliente (quando definido na carga) vence este padrão</span>
+        {transferiveis.length > 0 && (
+          <button
+            onClick={transferirTodas}
+            disabled={transferindo !== null}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:border-red-400 disabled:opacity-50"
+          >
+            <Warehouse className="h-3.5 w-3.5" />
+            {transferindo === '__lote__'
+              ? 'Transferindo lote…'
+              : `Transferir todas as estouradas (${transferiveis.length})`}
+          </button>
+        )}
       </div>
 
       {aviso ? (
@@ -97,7 +148,7 @@ export default function FreeTime() {
               <tbody>
                 {cargas.map((c) => (
                   <tr key={c.floorStockId} className="row-hover">
-                    <td className="td mono text-xs text-brand">{c.docType} · {c.fiscalDocumentId.slice(0, 8)}</td>
+                    <td className="td mono text-xs text-brand">{docLabel(c)}</td>
                     <td className="td text-ink-soft">{c.unidade ?? '—'}</td>
                     <td className="td text-right mono">{num(c.volumes)}</td>
                     <td className="td text-right mono font-medium">{c.horasNoPiso}h</td>

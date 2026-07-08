@@ -7,6 +7,9 @@ import { Badge, EmptyState, Modal, PageHeader, type Tone } from '../components/u
 import { cn, diasValidade, fmtDate, num } from '../lib/utils'
 import type { PosicaoEstoque, StatusEstoque } from '../lib/types'
 
+/** Posição + tipo do endereço (staging×picking×pulmão — achado da validação 08/07). */
+type PosRow = PosicaoEstoque & { tipoEndereco?: string | null }
+
 const STATUS_MAP: Record<string, StatusEstoque> = {
   DISPONIVEL: 'disponivel',
   QUARENTENA: 'quarentena',
@@ -16,7 +19,7 @@ const STATUS_MAP: Record<string, StatusEstoque> = {
 }
 
 /** Converte a posição do backend WMS para o shape que a tela já usa. */
-function mapPos(p: WmsStockPositionDTO): PosicaoEstoque {
+function mapPos(p: WmsStockPositionDTO): PosRow {
   return {
     id: p.id,
     skuCodigo: p.skuCode,
@@ -59,8 +62,8 @@ export default function Estoque() {
   const { estoque, ownerId, perfil, toast } = useStore()
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<StatusEstoque | 'todos'>('todos')
-  const [rows, setRows] = useState<PosicaoEstoque[]>(estoque)
-  const [det, setDet] = useState<PosicaoEstoque | null>(null)
+  const [rows, setRows] = useState<PosRow[]>(estoque)
+  const [det, setDet] = useState<PosRow | null>(null)
   const [movs, setMovs] = useState<WmsMovementDTO[]>([])
   const conectado = isConnected()
 
@@ -168,7 +171,24 @@ export default function Estoque() {
                   <tr key={p.id} className="row-hover cursor-pointer" onClick={() => setDet(p)}>
                     <td className="td mono font-medium text-brand">{p.skuCodigo}</td>
                     <td className="td text-ink">{p.descricao}</td>
-                    <td className="td mono">{p.endereco}</td>
+                    <td className="td mono">
+                      {p.endereco}
+                      {p.tipoEndereco ? (
+                        <span
+                          className={cn(
+                            'chip ml-1.5 text-[10px]',
+                            p.tipoEndereco === 'RECEBIMENTO'
+                              ? 'bg-amber-50 text-amber-700'
+                              : p.tipoEndereco === 'PICKING'
+                                ? 'bg-primary-50 text-primary'
+                                : 'bg-slate-100 text-ink-soft',
+                          )}
+                          title={p.tipoEndereco === 'RECEBIMENTO' ? 'Staging (endereço de recebimento) — aguardando guarda' : undefined}
+                        >
+                          {p.tipoEndereco === 'RECEBIMENTO' ? 'staging' : p.tipoEndereco.toLowerCase()}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="td">
                       <span className={cn('chip', p.curva === 'A' ? 'bg-primary-50 text-primary' : p.curva === 'B' ? 'bg-info-50 text-info' : 'bg-slate-100 text-ink-soft')}>
                         Curva {p.curva}

@@ -383,6 +383,7 @@ export interface WmsCargaPisoDTO {
   floorStockId: string
   fiscalDocumentId: string
   docType: string
+  docNumero: string | null
   unidade: string | null
   status: string
   arrivedAt: string
@@ -476,6 +477,7 @@ export interface OverviewEventoDTO {
   label: string | null
   status: 'PENDING' | 'AVAILABLE' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
   executedBy: string | null
+  executedByNome: string | null
   completedAt: string | null
   /** `event.data` quando COMPLETED (ex.: linhas da conferência, checklist). */
   data: Record<string, unknown> | null
