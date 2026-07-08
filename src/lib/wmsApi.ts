@@ -392,6 +392,13 @@ export interface WmsCargaPisoDTO {
   estourou: boolean
   horasRestantes: number
 }
+export interface WmsTransferenciaArmazenagemDTO {
+  floorStockId: string
+  status: string
+  enderecoStaging: string
+  warehouseId: string
+  ordens: { serviceOrderId: string; code: string; skuCode: string; quantity: number }[]
+}
 export interface WmsSeparacaoDTO {
   eventId: string
   code: string
@@ -553,6 +560,12 @@ export const wmsApi = {
   confronto: (chave: string) => wmsGet<WmsConfrontoDTO>(`/wms/confronto/${encodeURIComponent(chave)}`),
   registrarConfronto: (dto: Record<string, unknown>) => wmsSend<unknown>('POST', '/wms/confronto', dto),
   cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
+  transferirArmazenagem: (floorStockId: string, addressCode?: string) =>
+    wmsSend<WmsTransferenciaArmazenagemDTO>(
+      'POST',
+      `/wms/cargas-piso/${floorStockId}/transferir-armazenagem`,
+      addressCode ? { addressCode } : {},
+    ),
   abastecimentos: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/abastecimentos'),
   gerarAbastecimento: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/abastecimentos', dto),
   contagens: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/contagens'),

@@ -137,7 +137,7 @@ function formatarPercentual(valor: number) {
  */
 function KpisReais() {
   const conectado = isConnected()
-  const [kpis, setKpis] = useState<{ chegadas: number; embarques: number; piso: number; diverg: number } | null>(null)
+  const [kpis, setKpis] = useState<{ chegadas: number; embarques: number; piso: number; estouradas: number; diverg: number } | null>(null)
 
   useEffect(() => {
     if (!conectado) return
@@ -150,25 +150,37 @@ function KpisReais() {
     ]).then(([rec, car, piso, div]) => {
       if (!vivo) return
       const abertas = (l: { status: string }[]) => l.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED').length
-      setKpis({ chegadas: abertas(rec), embarques: abertas(car), piso: piso.length, diverg: div.length })
+      setKpis({
+        chegadas: abertas(rec),
+        embarques: abertas(car),
+        piso: piso.length,
+        estouradas: piso.filter((c) => c.estourou).length,
+        diverg: div.length,
+      })
     })
     return () => { vivo = false }
   }, [conectado])
 
   if (!conectado || !kpis) return null
   const cards = [
-    { label: 'Chegadas em andamento', n: kpis.chegadas, to: '/recebimento' },
-    { label: 'Embarques em andamento', n: kpis.embarques, to: '/expedicao' },
-    { label: 'Cargas no piso', n: kpis.piso, to: '/free-time' },
-    { label: 'Divergências abertas', n: kpis.diverg, to: '/divergencias-recebimento' },
+    { label: 'Chegadas em andamento', n: kpis.chegadas, to: '/recebimento', alerta: false },
+    { label: 'Embarques em andamento', n: kpis.embarques, to: '/expedicao', alerta: false },
+    // Badge de alerta do free time (decisão 12 — 08/07): estourou → vermelho.
+    {
+      label: kpis.estouradas > 0 ? `Cargas no piso · ${kpis.estouradas} free time estourado` : 'Cargas no piso',
+      n: kpis.piso,
+      to: '/free-time',
+      alerta: kpis.estouradas > 0,
+    },
+    { label: 'Divergências abertas', n: kpis.diverg, to: '/divergencias-recebimento', alerta: false },
   ]
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {cards.map((c) => (
-        <Link key={c.label} to={c.to} className="card p-3 hover:border-brand transition-colors">
+        <Link key={c.label} to={c.to} className={`card p-3 hover:border-brand transition-colors ${c.alerta ? 'border-red-400' : ''}`}>
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">{c.n}</span>
-            <Badge tone="ok" dot>real</Badge>
+            {c.alerta ? <Badge tone="bad">atenção</Badge> : <Badge tone="ok" dot>real</Badge>}
           </div>
           <div className="text-xs text-ink-muted mt-1">{c.label}</div>
         </Link>
