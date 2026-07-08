@@ -31,6 +31,7 @@ function mapPos(p: WmsStockPositionDTO): PosRow {
     ownerId: p.ownerId,
     quantidade: p.quantity,
     status: STATUS_MAP[p.status] ?? 'disponivel',
+    tipoEndereco: p.addressType ?? null,
   }
 }
 
