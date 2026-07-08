@@ -95,13 +95,20 @@ export async function wmsConnect(
 }
 
 /** GET autenticado no spoke (ex.: '/wms/stock-positions'). */
+/** Mensagem de erro do backend (Nest devolve `message` string ou string[]). */
+function erroDoBackend(body: unknown, path: string, status: number): string {
+  const m = (body as { message?: string | string[] } | null)?.message
+  const texto = Array.isArray(m) ? m[m.length - 1] : m
+  return texto || `WMS ${path}: HTTP ${status}`
+}
+
 export async function wmsGet<T>(path: string): Promise<T> {
   const s = getSession()
   if (!s) throw new Error('WMS não conectado')
   const r = await req<T>(`${s.spokeUrl}${path}`, {
     headers: { Authorization: `Bearer ${s.spokeToken}`, 'x-tenant-id': s.tenantId },
   })
-  if (r.status !== 200) throw new Error(`WMS ${path}: HTTP ${r.status}`)
+  if (r.status !== 200) throw new Error(erroDoBackend(r.body, path, r.status))
   return r.body as T
 }
 
@@ -117,7 +124,7 @@ export async function wmsSend<T>(method: string, path: string, body?: unknown): 
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-  if (r.status < 200 || r.status >= 300) throw new Error(`WMS ${path}: HTTP ${r.status}`)
+  if (r.status < 200 || r.status >= 300) throw new Error(erroDoBackend(r.body, path, r.status))
   return r.body as T
 }
 
