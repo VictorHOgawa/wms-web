@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Timer, AlertTriangle, PackageSearch, Warehouse } from 'lucide-react'
 import { isConnected, wmsApi, type WmsCargaPisoDTO } from '../lib/wmsApi'
+import { useStore } from '../store/useStore'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
 import { num } from '../lib/utils'
 
@@ -12,11 +13,11 @@ import { num } from '../lib/utils'
  */
 export default function FreeTime() {
   const conectado = isConnected()
+  const toast = useStore((s) => s.toast)
   const [horas, setHoras] = useState(24)
   const [cargas, setCargas] = useState<WmsCargaPisoDTO[]>([])
   const [loading, setLoading] = useState(conectado)
   const [transferindo, setTransferindo] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<{ tom: 'ok' | 'bad'; texto: string } | null>(null)
 
   const recarregar = useCallback(() => {
     if (!conectado) return
@@ -47,18 +48,16 @@ export default function FreeTime() {
     )
     if (!ok) return
     setTransferindo(c.floorStockId)
-    setAviso(null)
     try {
       const r = await wmsApi.transferirArmazenagem(c.floorStockId)
-      setAviso({
-        tom: 'ok',
-        texto: `Transferida para armazenagem (staging ${r.enderecoStaging}): ${r.ordens
-          .map((o) => `${o.code} · ${o.skuCode} × ${o.quantity}`)
-          .join(' | ')} — tarefas de guardar já disponíveis no coletor.`,
+      toast({
+        tipo: 'sucesso',
+        titulo: `Transferida para armazenagem (staging ${r.enderecoStaging})`,
+        texto: `${r.ordens.map((o) => `${o.code} · ${o.skuCode} × ${o.quantity}`).join(' | ')} — tarefa de guardar no coletor.`,
       })
       recarregar()
     } catch (e) {
-      setAviso({ tom: 'bad', texto: e instanceof Error ? e.message : 'Falha ao transferir.' })
+      toast({ tipo: 'erro', titulo: 'Falha ao transferir', texto: e instanceof Error ? e.message : undefined })
     } finally {
       setTransferindo(null)
     }
@@ -75,7 +74,6 @@ export default function FreeTime() {
     )
     if (!ok) return
     setTransferindo('__lote__')
-    setAviso(null)
     let feitas = 0
     const falhas: string[] = []
     for (const c of alvo) {
@@ -86,11 +84,10 @@ export default function FreeTime() {
         falhas.push(`${docLabel(c)}: ${e instanceof Error ? e.message : 'falha'}`)
       }
     }
-    setAviso({
-      tom: falhas.length === 0 ? 'ok' : 'bad',
-      texto:
-        `${feitas} de ${alvo.length} transferida(s) — tarefas de guardar no coletor.` +
-        (falhas.length ? ` Falharam: ${falhas.join(' | ')}` : ''),
+    toast({
+      tipo: falhas.length === 0 ? 'sucesso' : 'aviso',
+      titulo: `${feitas} de ${alvo.length} transferida(s) — tarefas de guardar no coletor`,
+      texto: falhas.length ? `Falharam: ${falhas.join(' | ')}` : undefined,
     })
     setTransferindo(null)
     recarregar()
@@ -130,10 +127,6 @@ export default function FreeTime() {
           </button>
         )}
       </div>
-
-      {aviso ? (
-        <div className={`card p-3 text-sm ${aviso.tom === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>{aviso.texto}</div>
-      ) : null}
 
       <div className="card overflow-hidden">
         {cargas.length === 0 ? (

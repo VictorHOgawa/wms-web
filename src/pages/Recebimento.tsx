@@ -52,6 +52,18 @@ function resumoConferencia(data: Record<string, unknown> | null): string | null 
   return `${conferido}/${esperado}${div > 0 ? ` · ${div} divergência(s)` : ''}`
 }
 
+/** Resumo da bipagem da descarga + resultado do confronto (event.data do BIPAGEM). */
+function resumoBipagem(data: Record<string, unknown> | null): string | null {
+  if (!data) return null
+  const bipado = Number(data.totalBipado ?? NaN)
+  if (Number.isNaN(bipado)) return null
+  const conf = data.confronto as { bate?: boolean; faltando?: string[]; sobrando?: string[] } | null
+  if (!conf) return `${bipado} bipado(s)`
+  return conf.bate
+    ? `${bipado} bipado(s) · confronto BATEU`
+    : `${bipado} bipado(s) · confronto: ${conf.faltando?.length ?? 0} faltando / ${conf.sobrando?.length ?? 0} sobrando`
+}
+
 export default function Recebimento() {
   const conectado = isConnected()
   const [ordens, setOrdens] = useState<WarehouseOverviewDTO[]>([])
@@ -193,6 +205,7 @@ export default function Recebimento() {
           const bipagem = os.eventos.find((e) => e.code === 'BIPAGEM')
           const conf = os.eventos.find((e) => e.code === 'CONFQUANTIDADE')
           const resumoConf = resumoConferencia(conf?.data ?? null)
+          const resumoBip = resumoBipagem(bipagem?.data ?? null)
           return (
             <div key={os.serviceOrderId} className="card overflow-hidden">
               <div className="border-b border-line px-4 py-3 flex flex-wrap items-center gap-2">
@@ -228,6 +241,7 @@ export default function Recebimento() {
                     >
                       {PASSO_LABEL[ev.code ?? ''] ?? ev.label}
                       {ev.code === 'CONFQUANTIDADE' && resumoConf ? ` — ${resumoConf}` : ''}
+                      {ev.code === 'BIPAGEM' && resumoBip ? ` — ${resumoBip}` : ''}
                       {ev.status === 'COMPLETED' && (ev.executedByNome || ev.completedAt) ? (
                         <span className="text-xs text-ink-muted">
                           {' '}
