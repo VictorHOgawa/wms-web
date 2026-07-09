@@ -18,6 +18,7 @@ import {
   wmsApi,
   type WarehouseOverviewDTO,
   type OverviewEventoDTO,
+  type WmsAutorizacaoDTO,
 } from '../lib/wmsApi'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
 
@@ -43,13 +44,20 @@ export default function Expedicao() {
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [verConcluidas, setVerConcluidas] = useState(false)
+  // A2: solicitações "carregar sem bipagem" pendentes (aprovar/negar no card).
+  const [autorizacoes, setAutorizacoes] = useState<WmsAutorizacaoDTO[]>([])
 
   const carregar = useCallback(() => {
     if (!conectado) return
     setLoading(true)
-    wmsApi
-      .warehouseOverview('Carregamento')
-      .then(setOrdens)
+    Promise.all([
+      wmsApi.warehouseOverview('Carregamento'),
+      wmsApi.autorizacoes('PENDENTE').catch(() => [] as WmsAutorizacaoDTO[]),
+    ])
+      .then(([ords, auts]) => {
+        setOrdens(ords)
+        setAutorizacoes(auts)
+      })
       .catch((e) => setMsg(e?.message ?? 'Falha ao buscar as expedições'))
       .finally(() => setLoading(false))
   }, [conectado])
@@ -74,6 +82,23 @@ export default function Expedicao() {
       carregar()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Falha ao confirmar o carregamento.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** A2: decide a solicitação "carregar sem bipagem" do coletor. */
+  const decidir = async (aut: WmsAutorizacaoDTO, status: 'APROVADA' | 'NEGADA') => {
+    setBusy(aut.id)
+    setMsg(null)
+    try {
+      await wmsApi.decidirAutorizacao(aut.id, status)
+      setMsg(status === 'APROVADA'
+        ? '✓ Liberado — o operador já pode concluir sem bipagem no coletor.'
+        : '✓ Negado — o operador precisa bipar as etiquetas.')
+      carregar()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Falha ao decidir a autorização.')
     } finally {
       setBusy(null)
     }
@@ -130,7 +155,7 @@ export default function Expedicao() {
           />
         </div>
       ) : (
-        visiveis.map((os) => <CardEmbarque key={os.serviceOrderId} os={os} busy={busy} onConfirmar={executar} />)
+        visiveis.map((os) => <CardEmbarque key={os.serviceOrderId} os={os} busy={busy} onConfirmar={executar} autorizacao={autorizacoes.find((a) => a.serviceOrderId === os.serviceOrderId) ?? null} onDecidir={decidir} />)
       )}
     </div>
   )
@@ -140,10 +165,14 @@ function CardEmbarque({
   os,
   busy,
   onConfirmar,
+  autorizacao,
+  onDecidir,
 }: {
   os: WarehouseOverviewDTO
   busy: string | null
   onConfirmar: (os: WarehouseOverviewDTO, ev: OverviewEventoDTO) => void
+  autorizacao: WmsAutorizacaoDTO | null
+  onDecidir: (aut: WmsAutorizacaoDTO, status: 'APROVADA' | 'NEGADA') => void
 }) {
   const checklist = os.eventos.find((e) => e.code === 'CHECKLISTCARREGA')
   const carregamento = os.eventos.find((e) => e.code === 'CARREGAMENTO')
@@ -178,6 +207,36 @@ function CardEmbarque({
           </Badge>
         )}
       </div>
+
+      {/* A2 — solicitação do coletor: carregar sem bipagem (aprovar/negar) */}
+      {autorizacao && (
+        <div className="px-4 py-3 border-b border-line bg-amber-50/50 flex flex-wrap items-center gap-2 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <span className="font-medium">
+            Solicitação do coletor: carregar SEM bipagem
+            {autorizacao.solicitadoPorNome ? ` — ${autorizacao.solicitadoPorNome}` : ''}
+          </span>
+          {autorizacao.motivo && <span className="text-xs text-ink-muted">({autorizacao.motivo})</span>}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy === autorizacao.id}
+              onClick={() => onDecidir(autorizacao, 'APROVADA')}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 hover:border-emerald-400 disabled:opacity-50"
+            >
+              Aprovar
+            </button>
+            <button
+              type="button"
+              disabled={busy === autorizacao.id}
+              onClick={() => onDecidir(autorizacao, 'NEGADA')}
+              className="rounded-lg border border-red-300 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 hover:border-red-400 disabled:opacity-50"
+            >
+              Negar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Passo 1 — checklist do coletor (resultado real) */}
       <div className="px-4 py-3 space-y-2">

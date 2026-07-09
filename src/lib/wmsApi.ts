@@ -400,6 +400,16 @@ export interface WmsCargaPisoDTO {
   estourou: boolean
   horasRestantes: number
 }
+/** Autorização de exceção (decisão A2): coletor solicita, supervisor decide aqui. */
+export interface WmsAutorizacaoDTO {
+  id: string
+  serviceOrderId: string
+  tipo: string
+  status: 'PENDENTE' | 'APROVADA' | 'NEGADA'
+  motivo: string | null
+  solicitadoPorNome: string | null
+  createdAt: string
+}
 export interface WmsTransferenciaArmazenagemDTO {
   floorStockId: string
   status: string
@@ -568,6 +578,10 @@ export const wmsApi = {
   confrontoChaves: () => wmsGet<WmsConfrontoChaveDTO[]>('/wms/confronto'),
   confronto: (chave: string) => wmsGet<WmsConfrontoDTO>(`/wms/confronto/${encodeURIComponent(chave)}`),
   registrarConfronto: (dto: Record<string, unknown>) => wmsSend<unknown>('POST', '/wms/confronto', dto),
+  autorizacoes: (status?: string) =>
+    wmsGet<WmsAutorizacaoDTO[]>(`/wms/autorizacoes${status ? `?status=${status}` : ''}`),
+  decidirAutorizacao: (id: string, status: 'APROVADA' | 'NEGADA') =>
+    wmsSend<WmsAutorizacaoDTO>('PATCH', `/wms/autorizacoes/${id}`, { status }),
   cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
   transferirArmazenagem: (floorStockId: string, addressCode?: string) =>
     wmsSend<WmsTransferenciaArmazenagemDTO>(
