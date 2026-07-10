@@ -225,6 +225,7 @@ export interface WmsAddressLiteDTO {
   vagasOcupadas?: number
   volumesOcupados?: number
   cheio?: boolean
+  zoneRef?: { id: string; code: string; name: string } | null
 }
 export interface WmsSkuLiteDTO {
   id: string

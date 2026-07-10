@@ -135,31 +135,69 @@ export default function Estoque() {
         {conectado && <Badge tone="ok">dados reais · WMS</Badge>}
       </PageHeader>
 
-      {/* Ocupação dos endereços de armazenagem: vagas usadas × capacidade. */}
+      {/* Ocupação dos endereços de armazenagem: mini-mapa por zona (célula por
+          endereço; vermelho = cheio, azul = parcial, claro = vago). */}
       {ocupacao.length > 0 && (
-        <div className="card p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">
-            Ocupação dos endereços (vagas de palete)
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {ocupacao.map((e) => (
-              <span
-                key={e.id}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs mono',
-                  e.cheio
-                    ? 'border-red-300 bg-red-50 text-red-700'
-                    : (e.vagasOcupadas ?? 0) > 0
-                      ? 'border-line bg-surface-sub text-ink-soft'
-                      : 'border-line text-ink-muted',
-                )}
-                title={`${e.type === 'PULMAO' ? 'Pulmão' : 'Picking'} · ${num(e.volumesOcupados ?? 0)} volumes`}
-              >
-                {e.code} {e.vagasOcupadas ?? 0}/{e.capacidadePaletes ?? '∞'}
-                {e.cheio && ' · cheio'}
-              </span>
-            ))}
+        <div className="card p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+              Ocupação dos endereços
+            </p>
+            <div className="flex items-center gap-3 text-[11px] text-ink-muted">
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> cheio</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-sky-400" /> parcial</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-line bg-surface-sub" /> vago</span>
+            </div>
           </div>
+          {Object.entries(
+            ocupacao.reduce<Record<string, typeof ocupacao>>((acc, e) => {
+              const zona = e.zoneRef?.name ?? (e.type === 'PULMAO' ? 'Pulmão' : 'Picking')
+              ;(acc[zona] ??= []).push(e)
+              return acc
+            }, {}),
+          ).map(([zona, ends]) => (
+            <div key={zona}>
+              <p className="text-[11px] font-medium text-ink-soft mb-1.5">
+                {zona}{' '}
+                <span className="text-ink-muted">
+                  · {ends.filter((e) => e.cheio).length}/{ends.length} cheios
+                </span>
+              </p>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
+                {ends.map((e) => {
+                  const usadas = e.vagasOcupadas ?? 0
+                  const cap = e.capacidadePaletes ?? 0
+                  return (
+                    <div
+                      key={e.id}
+                      title={`${e.code} · ${num(e.volumesOcupados ?? 0)} volumes · ${usadas}/${cap || '∞'} vagas`}
+                      className={cn(
+                        'rounded-lg border px-2 py-1.5',
+                        e.cheio
+                          ? 'border-red-300 bg-red-50'
+                          : usadas > 0
+                            ? 'border-sky-200 bg-sky-50'
+                            : 'border-line bg-surface-sub',
+                      )}
+                    >
+                      <p className="mono text-[11px] font-semibold text-ink-soft truncate">{e.code}</p>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <div className="h-1.5 flex-1 rounded-full bg-white overflow-hidden border border-line/60">
+                          <div
+                            className={cn('h-full', e.cheio ? 'bg-red-400' : 'bg-sky-400')}
+                            style={{ width: cap > 0 ? `${Math.min(100, (usadas / cap) * 100)}%` : usadas > 0 ? '100%' : '0%' }}
+                          />
+                        </div>
+                        <span className="mono text-[10px] text-ink-muted shrink-0">
+                          {usadas}/{cap || '∞'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

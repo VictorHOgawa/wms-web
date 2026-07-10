@@ -14,7 +14,11 @@ import { num } from '../lib/utils'
 export default function FreeTime() {
   const conectado = isConnected()
   const toast = useStore((s) => s.toast)
+  // "Free time padrão" aqui é um SIMULADOR de corte da listagem (não salva
+  // configuração): digita → Aplicar → a lista recalcula quem estourou com esse
+  // padrão. O padrão real continua 24h, vencido pelo contrato do cliente.
   const [horas, setHoras] = useState(24)
+  const [horasDraft, setHorasDraft] = useState('24')
   const [cargas, setCargas] = useState<WmsCargaPisoDTO[]>([])
   const [loading, setLoading] = useState(conectado)
   const [transferindo, setTransferindo] = useState<string | null>(null)
@@ -126,15 +130,28 @@ export default function FreeTime() {
 
       <div className="card p-3 flex flex-wrap items-center gap-3 text-sm">
         <Timer className="h-4 w-4 text-ink-muted" />
-        <span className="text-ink-soft">Free time padrão</span>
+        <span className="text-ink-soft">Simular free time padrão</span>
         <input
           type="number"
-          value={horas}
+          value={horasDraft}
           min={1}
-          onChange={(e) => setHoras(Math.max(1, Number(e.target.value) || 24))}
+          onChange={(e) => setHorasDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') setHoras(Math.max(1, Number(horasDraft) || 24))
+          }}
           className="w-20 rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-sm outline-none"
         />
-        <span className="text-ink-muted">horas — o contrato do cliente (quando definido na carga) vence este padrão</span>
+        <button
+          type="button"
+          onClick={() => setHoras(Math.max(1, Number(horasDraft) || 24))}
+          disabled={Math.max(1, Number(horasDraft) || 24) === horas}
+          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-primary/40 hover:text-primary disabled:opacity-40"
+        >
+          Aplicar
+        </button>
+        <span className="text-ink-muted">
+          simulação da listagem (padrão real: 24 h; o contrato do cliente vence o padrão)
+        </span>
         {transferiveis.length > 0 && (
           <button
             onClick={transferirTodas}
