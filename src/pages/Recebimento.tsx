@@ -49,7 +49,14 @@ function resumoConferencia(data: Record<string, unknown> | null): string | null 
   const conferido = Number(data.totalConferido ?? NaN)
   const div = Number(data.divergencias ?? 0)
   if (Number.isNaN(esperado) || Number.isNaN(conferido)) return null
-  return `${conferido}/${esperado}${div > 0 ? ` · ${div} divergência(s)` : ''}`
+  // A7/A8: a conferência bipada fecha o confronto carga×descarga aqui.
+  const conf = data.confronto as { bate?: boolean; faltando?: string[]; sobrando?: string[] } | null
+  const confTxt = conf
+    ? conf.bate
+      ? ' · confronto BATEU'
+      : ` · confronto: ${conf.faltando?.length ?? 0} faltando / ${conf.sobrando?.length ?? 0} sobrando`
+    : ''
+  return `${conferido}/${esperado}${div > 0 ? ` · ${div} divergência(s)` : ''}${confTxt}`
 }
 
 /** Resumo da bipagem da descarga + resultado do confronto (event.data do BIPAGEM). */

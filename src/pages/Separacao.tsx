@@ -236,10 +236,78 @@ function SeparacaoViagem({
             Gerar romaneio
           </button>
         )}
+        {romaneio?.status === 'COMPLETED' && (
+          <button
+            className="btn-outline text-xs"
+            title="Um romaneio por parada de entrega (decisão A4) — abre a versão de impressão"
+            onClick={() => imprimirRomaneios(os, romaneio.data)}
+          >
+            <FileText className="h-3.5 w-3.5 inline -mt-0.5 mr-1" />
+            Ver romaneio
+          </button>
+        )}
         {os.status === 'COMPLETED' && <Badge tone="ok">concluída</Badge>}
       </div>
     </div>
   )
+}
+
+/**
+ * A4: visão IMPRIMÍVEL do romaneio — um por parada de entrega, detalhado
+ * (documento → NFs → volumes). Abre em janela própria e chama a impressão.
+ */
+function imprimirRomaneios(os: WarehouseOverviewDTO, data: Record<string, unknown> | null) {
+  interface RomaneioNfe { numero: string | null; volumes: number }
+  interface RomaneioDoc { tipo: string | null; numero: string | null; weightKg: number | null; volumeM3: number | null; nfes: RomaneioNfe[] }
+  interface Romaneio { romaneio: string; sequence: number | null; destino: string | null; documentos: RomaneioDoc[]; totalDocumentos: number; pesoTotalKg: number; volumeTotalM3: number }
+  const romaneios = (data?.romaneios as Romaneio[] | undefined) ?? []
+  const esc = (v: unknown) => String(v ?? '—').replace(/</g, '&lt;')
+  const corpo = romaneios.length
+    ? romaneios
+        .map(
+          (r) => `
+    <section>
+      <h2>Romaneio ${esc(r.romaneio)} — parada ${esc(r.sequence)}${r.destino ? ` · ${esc(r.destino)}` : ''}</h2>
+      <table>
+        <thead><tr><th>Documento</th><th>NFs (volumes)</th><th>Peso (kg)</th><th>Volume (m³)</th></tr></thead>
+        <tbody>
+          ${r.documentos
+            .map(
+              (d) => `<tr>
+                <td>${esc(d.tipo)} ${esc(d.numero)}</td>
+                <td>${d.nfes.length ? d.nfes.map((n) => `NF ${esc(n.numero)} (${n.volumes} vol)`).join(', ') : '—'}</td>
+                <td>${d.weightKg ?? '—'}</td>
+                <td>${d.volumeM3 ?? '—'}</td>
+              </tr>`,
+            )
+            .join('')}
+        </tbody>
+      </table>
+      <p class="tot">${r.totalDocumentos} documento(s) · ${r.pesoTotalKg} kg · ${r.volumeTotalM3} m³</p>
+    </section>`,
+        )
+        .join('')
+    : '<p>Romaneio antigo (antes da decisão A4) — sem detalhamento por parada.</p>'
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Romaneio — ${esc(os.trip?.code ?? os.code)}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;margin:24px;color:#111}
+      h1{font-size:18px;margin:0 0 4px} .sub{color:#555;font-size:12px;margin-bottom:16px}
+      h2{font-size:14px;margin:18px 0 6px}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th,td{border:1px solid #ccc;padding:4px 8px;text-align:left}
+      th{background:#f3f4f6} .tot{font-size:11px;color:#555}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Romaneio de carga — viagem ${esc(os.trip?.code ?? '')}</h1>
+    <div class="sub">O.S ${esc(os.code)} · CD ${esc(os.cd?.name)} · um romaneio por parada de entrega</div>
+    ${corpo}
+    <button onclick="window.print()">Imprimir</button>
+  </body></html>`
+  const w = window.open('', '_blank', 'width=900,height=700')
+  if (w) {
+    w.document.write(html)
+    w.document.close()
+  }
 }
 
 function LinhaPosicao({ pos, onGerar }: { pos: WmsStockPositionDTO; onGerar: (p: WmsStockPositionDTO, qtd: number) => void }) {

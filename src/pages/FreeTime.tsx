@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Timer, AlertTriangle, PackageSearch, Warehouse } from 'lucide-react'
 import { isConnected, wmsApi, type WmsCargaPisoDTO } from '../lib/wmsApi'
 import { useStore } from '../store/useStore'
@@ -58,6 +58,27 @@ export default function FreeTime() {
       recarregar()
     } catch (e) {
       toast({ tipo: 'erro', titulo: 'Falha ao transferir', texto: e instanceof Error ? e.message : undefined })
+    } finally {
+      setTransferindo(null)
+    }
+  }
+
+  /** A9: transfere UM PALLET da carga (parcial — o resto segue no piso). */
+  const transferirPallet = async (c: WmsCargaPisoDTO, palletCodigo: string) => {
+    setTransferindo(`${c.floorStockId}:${palletCodigo}`)
+    try {
+      const r = await wmsApi.transferirArmazenagem(c.floorStockId, { palletCodigo })
+      toast({
+        tipo: 'sucesso',
+        titulo: `Pallet ${palletCodigo} guardado (staging ${r.enderecoStaging})`,
+        texto:
+          r.status === 'GUARDADA'
+            ? 'Era o último pallet — a carga inteira saiu do piso.'
+            : `${r.palletsRestantes ?? '?'} pallet(s) da carga ainda no piso.`,
+      })
+      recarregar()
+    } catch (e) {
+      toast({ tipo: 'erro', titulo: 'Falha ao guardar o pallet', texto: e instanceof Error ? e.message : undefined })
     } finally {
       setTransferindo(null)
     }
@@ -140,7 +161,8 @@ export default function FreeTime() {
               </tr></thead>
               <tbody>
                 {cargas.map((c) => (
-                  <tr key={c.floorStockId} className="row-hover">
+                  <React.Fragment key={c.floorStockId}>
+                  <tr className="row-hover">
                     <td className="td mono text-xs text-brand">{docLabel(c)}</td>
                     <td className="td text-ink-soft">{c.unidade ?? '—'}</td>
                     <td className="td text-right mono">{num(c.volumes)}</td>
@@ -167,6 +189,43 @@ export default function FreeTime() {
                       )}
                     </td>
                   </tr>
+                  {/* A9: pallets da carga — guarda parcial por pallet */}
+                  {(c.pallets?.length ?? 0) > 0 && (
+                    <tr>
+                      <td colSpan={6} className="td bg-surface-sub/50">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-ink-muted">Pallets:</span>
+                          {c.pallets!.map((p) => (
+                            <span
+                              key={p.codigo}
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
+                                p.guardado
+                                  ? 'border-emerald-300 text-emerald-700'
+                                  : p.estourou
+                                    ? 'border-red-300 text-red-700'
+                                    : 'border-line text-ink-soft'
+                              }`}
+                              title="Relógio próprio do pallet (chegada bipada no recebimento; sem bipagem, herda a da carga)"
+                            >
+                              <span className="mono">{p.codigo}</span> · {p.volumes} vol · {p.horasNoPiso}h
+                              {p.guardado ? (
+                                <span>· guardado ✓</span>
+                              ) : p.estourou && c.status === 'AGUARDANDO' ? (
+                                <button
+                                  onClick={() => transferirPallet(c, p.codigo)}
+                                  disabled={transferindo !== null}
+                                  className="ml-1 rounded border border-red-300 px-1.5 py-0.5 hover:border-red-500 disabled:opacity-50"
+                                >
+                                  {transferindo === `${c.floorStockId}:${p.codigo}` ? 'guardando…' : 'guardar pallet'}
+                                </button>
+                              ) : null}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

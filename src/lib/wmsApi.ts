@@ -391,6 +391,7 @@ export interface WmsCargaPisoDTO {
   fiscalDocumentId: string
   docType: string
   docNumero: string | null
+  destino: string | null
   unidade: string | null
   status: string
   arrivedAt: string
@@ -399,6 +400,8 @@ export interface WmsCargaPisoDTO {
   freeTimeHoras: number
   estourou: boolean
   horasRestantes: number
+  /** A9/A9+: pallets da carga — guarda parcial e relógio próprio por pallet. */
+  pallets?: Array<{ codigo: string; volumes: number; guardado: boolean; horasNoPiso: number; estourou: boolean }>
 }
 /** Autorização de exceção (decisão A2): coletor solicita, supervisor decide aqui. */
 export interface WmsAutorizacaoDTO {
@@ -506,6 +509,8 @@ export interface OverviewDocumentoDTO {
   kind: 'pickup' | 'delivery' | string
   weightKg: number | null
   volumeM3: number | null
+  /** Expedição por rota: sequência da parada de ENTREGA (embarque = inverso). */
+  entregaSequencia?: number | null
 }
 /** O.S de armazém da viagem com a história completa (GET /service-orders/warehouse-overview). */
 export interface WarehouseOverviewDTO {
@@ -583,11 +588,11 @@ export const wmsApi = {
   decidirAutorizacao: (id: string, status: 'APROVADA' | 'NEGADA') =>
     wmsSend<WmsAutorizacaoDTO>('PATCH', `/wms/autorizacoes/${id}`, { status }),
   cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
-  transferirArmazenagem: (floorStockId: string, addressCode?: string) =>
-    wmsSend<WmsTransferenciaArmazenagemDTO>(
+  transferirArmazenagem: (floorStockId: string, opts?: { addressCode?: string; palletCodigo?: string }) =>
+    wmsSend<WmsTransferenciaArmazenagemDTO & { pallet?: string; palletsRestantes?: number }>(
       'POST',
       `/wms/cargas-piso/${floorStockId}/transferir-armazenagem`,
-      addressCode ? { addressCode } : {},
+      opts ?? {},
     ),
   abastecimentos: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/abastecimentos'),
   gerarAbastecimento: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/abastecimentos', dto),

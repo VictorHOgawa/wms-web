@@ -255,6 +255,21 @@ function CardEmbarque({
               : ' — aguardando o operador'}
           </span>
         </div>
+        {(() => {
+          // Expedição por ROTA: último a entregar embarca primeiro.
+          const pickups = os.documentos.filter((d) => d.kind === 'pickup' && d.entregaSequencia != null)
+          if (pickups.length < 2) return null
+          const ordenados = [...pickups].sort((a, b) => (b.entregaSequencia ?? -1) - (a.entregaSequencia ?? -1))
+          return (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <Badge tone="neutral">ordem de embarque</Badge>
+              <span className="text-ink-soft">
+                {ordenados.map((d, i) => `${i + 1}º ${d.tipo ?? 'DOC'} ${d.numero ?? '—'} (entrega ${d.entregaSequencia})`).join(' → ')}
+              </span>
+              <span className="text-ink-muted">— último a entregar sobe primeiro</span>
+            </div>
+          )
+        })()}
         {etiquetasBipadas != null && (
           <div className="flex items-center gap-1.5 text-xs text-ink-soft">
             <Badge tone={etiquetasDesconhecidas > 0 ? 'warn' : 'ok'} dot>
