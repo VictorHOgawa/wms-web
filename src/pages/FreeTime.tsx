@@ -14,11 +14,11 @@ import { num } from '../lib/utils'
 export default function FreeTime() {
   const conectado = isConnected()
   const toast = useStore((s) => s.toast)
-  // "Free time padrão" aqui é um SIMULADOR de corte da listagem (não salva
-  // configuração): digita → Aplicar → a lista recalcula quem estourou com esse
-  // padrão. O padrão real continua 24h, vencido pelo contrato do cliente.
-  const [horas, setHoras] = useState(24)
-  const [horasDraft, setHorasDraft] = useState('24')
+  // "Simular free time" é um what-if da listagem: vazio = usa a CONFIGURAÇÃO
+  // (parâmetro por cliente → CD → global, editável no admin em Parâmetros);
+  // um número + Aplicar recalcula quem estouraria com aquele padrão.
+  const [horas, setHoras] = useState<number | null>(null)
+  const [horasDraft, setHorasDraft] = useState('')
   const [cargas, setCargas] = useState<WmsCargaPisoDTO[]>([])
   const [loading, setLoading] = useState(conectado)
   const [transferindo, setTransferindo] = useState<string | null>(null)
@@ -26,7 +26,7 @@ export default function FreeTime() {
   const recarregar = useCallback(() => {
     if (!conectado) return
     setLoading(true)
-    wmsApi.cargasEmPiso(horas)
+    wmsApi.cargasEmPiso(horas ?? undefined)
       .then(setCargas)
       .catch(() => { /* mantém */ })
       .finally(() => setLoading(false))
@@ -130,27 +130,30 @@ export default function FreeTime() {
 
       <div className="card p-3 flex flex-wrap items-center gap-3 text-sm">
         <Timer className="h-4 w-4 text-ink-muted" />
-        <span className="text-ink-soft">Simular free time padrão</span>
+        <span className="text-ink-soft">Simular free time</span>
         <input
           type="number"
           value={horasDraft}
           min={1}
+          placeholder="auto"
           onChange={(e) => setHorasDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') setHoras(Math.max(1, Number(horasDraft) || 24))
+            if (e.key === 'Enter') setHoras(Number(horasDraft) > 0 ? Number(horasDraft) : null)
           }}
           className="w-20 rounded-lg border border-line bg-surface-sub px-2 py-1.5 text-sm outline-none"
         />
         <button
           type="button"
-          onClick={() => setHoras(Math.max(1, Number(horasDraft) || 24))}
-          disabled={Math.max(1, Number(horasDraft) || 24) === horas}
+          onClick={() => setHoras(Number(horasDraft) > 0 ? Number(horasDraft) : null)}
+          disabled={(Number(horasDraft) > 0 ? Number(horasDraft) : null) === horas}
           className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-primary/40 hover:text-primary disabled:opacity-40"
         >
           Aplicar
         </button>
         <span className="text-ink-muted">
-          simulação da listagem (padrão real: 24 h; o contrato do cliente vence o padrão)
+          {horas
+            ? `simulando ${horas} h — limpe e aplique para voltar à configuração`
+            : 'usando a configuração: contrato do cliente → CD → global (admin · Parâmetros) → 24 h'}
         </span>
         {transferiveis.length > 0 && (
           <button

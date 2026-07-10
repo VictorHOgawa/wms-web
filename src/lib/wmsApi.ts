@@ -594,7 +594,10 @@ export const wmsApi = {
     wmsGet<WmsAutorizacaoDTO[]>(`/wms/autorizacoes${status ? `?status=${status}` : ''}`),
   decidirAutorizacao: (id: string, status: 'APROVADA' | 'NEGADA') =>
     wmsSend<WmsAutorizacaoDTO>('PATCH', `/wms/autorizacoes/${id}`, { status }),
-  cargasEmPiso: (freeTimeHoras = 24) => wmsGet<WmsCargaPisoDTO[]>(`/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}`),
+  cargasEmPiso: (freeTimeHoras?: number) =>
+    wmsGet<WmsCargaPisoDTO[]>(
+      freeTimeHoras ? `/wms/cargas-piso?freeTimeHoras=${freeTimeHoras}` : '/wms/cargas-piso',
+    ),
   transferirArmazenagem: (floorStockId: string, opts?: { addressCode?: string; palletCodigo?: string }) =>
     wmsSend<WmsTransferenciaArmazenagemDTO & { pallet?: string; palletsRestantes?: number }>(
       'POST',

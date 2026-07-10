@@ -61,6 +61,7 @@ export const NAV: NavItem[] = [
 
   // Piso e estoque endereçado (tudo REAL).
   { to: '/estoque', label: 'Estoque', icon: Boxes, group: 'Piso & Estoque' },
+  { to: '/planta-3d', label: 'Planta 3D', icon: Box, group: 'Piso & Estoque' },
   { to: '/movimentos', label: 'Movimentos', icon: History, group: 'Piso & Estoque' },
   { to: '/staging', label: 'Entrada & Staging', icon: Boxes, group: 'Piso & Estoque' },
   { to: '/pallets', label: 'Pallets', icon: Layers, group: 'Piso & Estoque' },
@@ -82,7 +83,7 @@ export const NAV: NavItem[] = [
   // 100% mock — vitrines do que vem na fase de ARMAZENAGEM plena (e módulos
   // ainda não iniciados). Nada aqui grava dado real.
   { to: '/putaway', label: 'Endereçamento (putaway)', icon: MapPin, group: 'Demonstração', badge: 'demo' },
-  { to: '/mapa-3d', label: 'Planta 3D', icon: Box, group: 'Demonstração', badge: 'demo' },
+  { to: '/mapa-3d', label: 'Putaway 3D (conceito)', icon: Box, group: 'Demonstração', badge: 'demo' },
   { to: '/montagem', label: 'Montagem 3D', icon: Layers, group: 'Demonstração', badge: 'demo' },
   { to: '/controle-sku', label: 'Controle SKU', icon: Boxes, group: 'Demonstração', badge: 'demo' },
   { to: '/ocorrencias', label: 'Ocorrências', icon: ShieldAlert, group: 'Demonstração', badge: 'demo' },

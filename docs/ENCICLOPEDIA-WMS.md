@@ -113,7 +113,10 @@ navegador em 09–10/07.
   (unidade→filial — nunca "o primeiro do banco").
 
 ### Outras regras vivas
-- Free time: default 24h; por contrato via `freeTimeHoras` (generalidade).
+- Free time CONFIGURÁVEL (10/07): cadeia **carga (gravado) → parâmetro por
+  CLIENTE (= contrato) → por CD → global → 24h**, editável no admin em
+  Parâmetros (chave `free_time_horas`, escopos global/CD/cliente). O campo na
+  tela Free time da torre é só SIMULAÇÃO what-if ("auto" = configuração).
 - Etiqueta de volume genérica **CARGA-VOLUME** para CT-e sem espelho de NF.
 - **Reemitir etiquetas do mesmo documento é barrado** (achado 10/07 — cliques
   repetidos triplicavam lotes); reemissão só explícita. A emissão persiste lote
@@ -169,7 +172,8 @@ navegador em 09–10/07.
 | Tela | O que é | Base para sair do mock | Recomendação |
 |---|---|---|---|
 | Endereçamento (putaway) | fila visual fake | O motor REAL já existe (sugestão+capacidade); falta só listar as O.S TMSGUARDAR com sugerido/executado | Fácil de virar real — próximo incremento natural |
-| Planta 3D / Montagem 3D | grade procedural | Gerar do cadastro real de endereços (rua/coluna/nível já existem no schema) | Manter vitrine até a fase de armazenagem plena |
+| ~~Planta 3D~~ | **VIROU REAL (10/07)**: `/planta-3d` no grupo Piso & Estoque — galpão desenhado do cadastro (rua/coluna/nível; sem estrutura entra na fileira da zona), células coloridas pela ocupação, clique = detalhe | Próximos passos: pallets/volumes dentro da célula, duplo clique → Estoque filtrado | — |
+| Putaway 3D (conceito, ex-"Planta 3D") / Montagem 3D | jogo procedural de putaway | superado pelo motor real de guarda | Manter vitrine / candidata a remover |
 | Controle SKU | CRUD em memória | Admin→Produtos já é o cadastro real | **Candidata a remover** (duplica o admin) |
 | Ocorrências / Tarefas | fila fake de operador | A fila real é o coletor (decisão de 06/07) | **Candidatas a remover** |
 | Relatórios & KPIs | estático | Dashboard real já cobre o essencial; relatórios exigem agregações novas | Manter vitrine |

@@ -43,6 +43,7 @@ import Configuracoes from './pages/Configuracoes'
 import TransicaoOperacional from './pages/TransicaoOperacional'
 
 const Mapa3D = lazy(() => import('./pages/Mapa3D'))
+const Planta3DReal = lazy(() => import('./pages/Planta3DReal'))
 
 export default function App() {
   const autenticado = useStore((s) => s.autenticado)
@@ -85,6 +86,20 @@ export default function App() {
                 }
               >
                 <Mapa3D />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/planta-3d"
+            element={
+              <Suspense
+                fallback={
+                  <div className="flex h-[60vh] items-center justify-center text-sm text-ink-muted">
+                    Carregando planta 3D…
+                  </div>
+                }
+              >
+                <Planta3DReal />
               </Suspense>
             }
           />
