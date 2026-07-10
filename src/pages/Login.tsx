@@ -32,11 +32,15 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setAviso(null)
-    // Tenta conectar ao WMS real (Hub → spoke). Não bloqueia: se falhar, o app
-    // abre em modo demo (dados mock).
+    // Conexão real (Hub → spoke) é OBRIGATÓRIA (decisão 10/07: sem modo demo
+    // silencioso — credencial inválida ou backend fora não entram).
     const res = await wmsConnect(email, senha)
-    if (!res.ok) setAviso(res.message ?? 'Modo demo (sem backend).')
-    login(perfil, res.ok ? email : 'Operador Demo')
+    if (!res.ok) {
+      setAviso(res.message ?? 'Não foi possível conectar ao WMS. Verifique credenciais e conexão.')
+      setLoading(false)
+      return
+    }
+    login(perfil, email)
     nav('/')
   }
 
@@ -175,7 +179,7 @@ export default function Login() {
           )}
 
           <p className="mt-6 text-center text-xs text-ink-muted">
-            Conecta ao WMS real se as credenciais do Hub forem válidas · senão, modo demo
+            Entre com as credenciais do Hub — a torre trabalha somente com dados reais
           </p>
         </div>
       </div>

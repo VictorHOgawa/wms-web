@@ -59,6 +59,21 @@ export default function Separacao() {
     [posicoes],
   )
 
+  // SKUs com saldo em armazenagem (picking/pulmão) — insumo do modo FEFO.
+  const skusDisponiveis = useMemo(() => {
+    const porSku = new Map<string, { skuId: string; skuCode: string; descricao: string; ownerId: string; saldo: number }>()
+    for (const p of posicoes) {
+      if (p.status !== 'DISPONIVEL' || p.quantity <= 0) continue
+      if (p.addressType !== 'PICKING' && p.addressType !== 'PULMAO') continue
+      const cur = porSku.get(p.skuId) ?? { skuId: p.skuId, skuCode: p.skuCode, descricao: p.skuDescription, ownerId: p.ownerId, saldo: 0 }
+      cur.saldo += p.quantity
+      porSku.set(p.skuId, cur)
+    }
+    return [...porSku.values()].sort((a, b) => a.skuCode.localeCompare(b.skuCode))
+  }, [posicoes])
+  const [fefoSku, setFefoSku] = useState('')
+  const [fefoQtd, setFefoQtd] = useState('')
+
   const gerar = async (pos: WmsStockPositionDTO, qtd: number) => {
     setMsg(null)
     try {
@@ -68,6 +83,25 @@ export default function Separacao() {
     } catch (e) { setMsg(e instanceof Error ? e.message : 'Falha ao gerar separação.') }
   }
 
+  /** FEFO automático (10/07): o motor escolhe as posições por validade. */
+  const gerarFefo = async () => {
+    const sku = skusDisponiveis.find((s) => s.skuId === fefoSku)
+    const qtd = Number(fefoQtd) || 0
+    if (!sku || qtd <= 0) return
+    setMsg(null)
+    try {
+      const r = await wmsApi.gerarSeparacao({ skuId: sku.skuId, ownerId: sku.ownerId, quantity: qtd })
+      const n = r.ordens?.length ?? 0
+      setMsg(
+        n > 1
+          ? `Separação automática (FEFO): ${n} O.S geradas — ${r.ordens!.map((o) => o.code).join(', ')} — validade mais próxima primeiro. Caem no coletor.`
+          : `Separação ${r.ordens?.[0]?.code ?? ''} gerada por FEFO — ${qtd} un de ${sku.skuCode}. Cai no coletor.`,
+      )
+      setFefoQtd('')
+      await carregar()
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Falha ao gerar separação automática.') }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Separação (picking)" subtitle="Despacha a separação de uma posição de picking; o coletor executa e baixa o estoque">
@@ -75,6 +109,50 @@ export default function Separacao() {
       </PageHeader>
 
       {msg && <div className="card p-3 text-sm text-ink-soft">{msg}</div>}
+
+      {/* Separação automática por FEFO: informe SKU + quantidade e o motor
+          escolhe as posições (validade mais próxima primeiro), podendo quebrar
+          em várias O.S. */}
+      {conectado && skusDisponiveis.length > 0 && (
+        <div className="card p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[16rem] flex-1">
+              <label className="label">Separação automática (FEFO)</label>
+              <select className="input" value={fefoSku} onChange={(e) => setFefoSku(e.target.value)}>
+                <option value="">Escolha o produto…</option>
+                {skusDisponiveis.map((s) => (
+                  <option key={s.skuId} value={s.skuId}>
+                    {s.skuCode} — {s.descricao} · saldo {num(s.saldo)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-28">
+              <label className="label">Quantidade</label>
+              <input
+                type="number"
+                min={1}
+                className="input"
+                value={fefoQtd}
+                onChange={(e) => setFefoQtd(e.target.value)}
+                placeholder="ex.: 30"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!fefoSku || (Number(fefoQtd) || 0) <= 0}
+              onClick={() => void gerarFefo()}
+            >
+              Separar por FEFO
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
+            O sistema escolhe as posições pela validade mais próxima (picking antes de pulmão) e
+            gera uma O.S por posição — o coletor executa cada uma.
+          </p>
+        </div>
+      )}
 
       {/* Separações que NASCEM DA VIAGEM (O.S do blueprint): lista + romaneio. */}
       {conectado && osViagem.filter((o) => o.status !== 'CANCELLED').length > 0 && (

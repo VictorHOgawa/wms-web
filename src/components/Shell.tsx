@@ -94,8 +94,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
           <span className="h-2 w-2 rounded-full bg-ok animate-pulse-ok" />
           <div className="text-xs">
-            <p className="text-brand font-semibold">Modo offline-first</p>
-            <p className="text-slate-500">Sincronização ativa</p>
+            <p className="text-brand font-semibold">Dados reais do WMS</p>
+            <p className="text-slate-500">Conectado ao servidor</p>
           </div>
         </div>
       </div>

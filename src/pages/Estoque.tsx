@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Boxes, Filter } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { ownerColor, ownerName } from '../lib/mock'
-import { isConnected, wmsApi, type WmsMovementDTO, type WmsStockPositionDTO } from '../lib/wmsApi'
+import { isConnected, wmsApi, type WmsAddressLiteDTO, type WmsMovementDTO, type WmsStockPositionDTO } from '../lib/wmsApi'
 import { Badge, EmptyState, Modal, PageHeader, type Tone } from '../components/ui'
 import { cn, diasValidade, fmtDate, num } from '../lib/utils'
 import type { PosicaoEstoque, StatusEstoque } from '../lib/types'
@@ -60,33 +60,45 @@ const FILTROS: { id: StatusEstoque | 'todos'; l: string }[] = [
 ]
 
 export default function Estoque() {
-  const { estoque, ownerId, perfil, toast } = useStore()
+  const { ownerId, perfil, toast } = useStore()
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<StatusEstoque | 'todos'>('todos')
-  const [rows, setRows] = useState<PosRow[]>(estoque)
+  const [rows, setRows] = useState<PosRow[]>([])
   const [det, setDet] = useState<PosRow | null>(null)
   const [movs, setMovs] = useState<WmsMovementDTO[]>([])
+  const [enderecos, setEnderecos] = useState<WmsAddressLiteDTO[]>([])
   const conectado = isConnected()
 
-  // Quando conectado ao backend real, substitui o mock por posições/movimentos
-  // vivos do WMS. Sem conexão, mantém os dados de demonstração.
+  // Posições/movimentos/endereços vivos do WMS (10/07: sem semente mock — a
+  // tela nasce vazia e carrega o real; o login já exige conexão).
   useEffect(() => {
     if (!conectado) return
     let vivo = true
     ;(async () => {
       try {
-        const [pos, mv] = await Promise.all([wmsApi.stockPositions(), wmsApi.movements(200)])
+        const [pos, mv, ends] = await Promise.all([
+          wmsApi.stockPositions(),
+          wmsApi.movements(200),
+          wmsApi.addresses().catch(() => [] as WmsAddressLiteDTO[]),
+        ])
         if (!vivo) return
         setRows(pos.map(mapPos))
         setMovs(mv)
+        setEnderecos(ends)
       } catch {
-        /* falhou: mantém o mock já carregado */
+        /* falhou: tela fica vazia (estado honesto) */
       }
     })()
     return () => {
       vivo = false
     }
   }, [conectado])
+
+  // Ocupação dos endereços de armazenagem (vagas × capacidade) — 10/07.
+  const ocupacao = useMemo(
+    () => enderecos.filter((e) => e.type === 'PICKING' || e.type === 'PULMAO'),
+    [enderecos],
+  )
 
   const lista = useMemo(() => {
     return rows.filter((p) => {
@@ -122,6 +134,34 @@ export default function Estoque() {
         <Badge tone="neutral">{num(lista.length)} posições · {num(totalUn)} un</Badge>
         {conectado && <Badge tone="ok">dados reais · WMS</Badge>}
       </PageHeader>
+
+      {/* Ocupação dos endereços de armazenagem: vagas usadas × capacidade. */}
+      {ocupacao.length > 0 && (
+        <div className="card p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">
+            Ocupação dos endereços (vagas de palete)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {ocupacao.map((e) => (
+              <span
+                key={e.id}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs mono',
+                  e.cheio
+                    ? 'border-red-300 bg-red-50 text-red-700'
+                    : (e.vagasOcupadas ?? 0) > 0
+                      ? 'border-line bg-surface-sub text-ink-soft'
+                      : 'border-line text-ink-muted',
+                )}
+                title={`${e.type === 'PULMAO' ? 'Pulmão' : 'Picking'} · ${num(e.volumesOcupados ?? 0)} volumes`}
+              >
+                {e.code} {e.vagasOcupadas ?? 0}/{e.capacidadePaletes ?? '∞'}
+                {e.cheio && ' · cheio'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card p-3 flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-sub px-3 py-2 flex-1">

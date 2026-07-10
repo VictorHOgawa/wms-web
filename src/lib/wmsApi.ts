@@ -135,6 +135,7 @@ export interface WmsStockPositionDTO {
   addressCode: string
   addressType: string
   addressZone: string | null
+  skuId: string
   skuCode: string
   skuDescription: string
   curve: string
@@ -219,6 +220,11 @@ export interface WmsAddressLiteDTO {
   code: string
   type: string
   blocked: boolean
+  capacidadePaletes?: number
+  capacidadePeso?: number
+  vagasOcupadas?: number
+  volumesOcupados?: number
+  cheio?: boolean
 }
 export interface WmsSkuLiteDTO {
   id: string
@@ -599,7 +605,8 @@ export const wmsApi = {
   contagens: () => wmsGet<WmsTarefaArmazemDTO[]>('/wms/contagens'),
   gerarContagem: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/contagens', dto),
   separacoes: () => wmsGet<WmsSeparacaoDTO[]>('/wms/separacoes'),
-  gerarSeparacao: (dto: Record<string, unknown>) => wmsSend<{ code: string }>('POST', '/wms/separacoes', dto),
+  gerarSeparacao: (dto: Record<string, unknown>) =>
+    wmsSend<{ code?: string; modo?: string; ordens?: { code: string }[] }>('POST', '/wms/separacoes', dto),
   apontamentos: (chave?: string) => wmsGet<WmsApontamentoDTO[]>(`/wms/apontamentos${chave ? `?chave=${encodeURIComponent(chave)}` : ''}`),
   registrarApontamento: (dto: Record<string, unknown>) => wmsSend<WmsApontamentoDTO>('POST', '/wms/apontamentos', dto),
   validarApontamento: (id: string, dto: Record<string, unknown>) => wmsSend<WmsApontamentoDTO>('POST', `/wms/apontamentos/${id}/validar`, dto),

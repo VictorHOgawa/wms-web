@@ -1,12 +1,9 @@
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Legend,
-  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -14,59 +11,57 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import {
-  ClipboardCheck,
-  ArrowUpRight,
-  ArrowDownRight,
-  Truck,
-  PackageCheck,
-  Tags,
-  Warehouse,
-  Shuffle,
-} from 'lucide-react'
+import { Truck, PackageCheck, Warehouse, Boxes, ShieldCheck, ListChecks } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import {
-  FLUXO_DIA,
-  OCUPACAO_ZONAS,
-  ORDENS_EXECUCAO_SEMANA,
-  STATUS_PEDIDOS,
-  VIAGENS_ETIQUETAGEM,
-} from '../lib/mock'
 import { useStore } from '../store/useStore'
 import { Badge, PageHeader, Progress, type Tone } from '../components/ui'
 import { cn } from '../lib/utils'
-import { calcularEtiquetas, emissaoAutomaticaIso, type ViagemComRecebimento } from '../lib/etiquetas'
-import { skusPendentesDoRecebimento } from '../lib/skuControle'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { TipoTarefa } from '../lib/types'
-import { isConnected, wmsApi } from '../lib/wmsApi'
+import { isConnected, wmsApi, type WmsMovementDTO } from '../lib/wmsApi'
 
-const tipoTarefaLabel: Record<TipoTarefa, { l: string; tone: Tone }> = {
-  recebimento: { l: 'Receb.', tone: 'info' },
-  putaway: { l: 'Putaway', tone: 'info' },
-  picking: { l: 'Picking', tone: 'primary' },
-  packing: { l: 'Packing', tone: 'accent' },
-  carregamento: { l: 'Carga', tone: 'info' },
-  reabastecimento: { l: 'Reabast.', tone: 'accent' },
-  contagem: { l: 'Contagem', tone: 'neutral' },
-  recontagem: { l: 'Recont.', tone: 'warn' },
-  divergencia: { l: 'Diverg.', tone: 'bad' },
-  'cross-docking': { l: 'Cross-dock', tone: 'warn' },
+/**
+ * Dashboard 100% REAL (decisão 10/07: fim do modo demo) — tudo aqui vem do
+ * spoke. Sem fonte real, o bloco mostra o estado vazio honesto em vez de
+ * número de mentira.
+ */
+
+const tooltipStyle = {
+  borderRadius: 12,
+  border: '1px solid #e5e9f0',
+  boxShadow: '0 10px 30px -10px rgba(10,19,30,0.25)',
+  fontSize: 12,
+}
+
+const MOV_LABEL: Record<string, { l: string; tone: Tone }> = {
+  RECEIVE: { l: 'Recebido', tone: 'info' },
+  PUTAWAY: { l: 'Guardado', tone: 'primary' },
+  PICK: { l: 'Separado', tone: 'accent' },
+  REPLEN: { l: 'Abastecido', tone: 'ok' },
+  COUNT_ADJUST_UP: { l: 'Ajuste +', tone: 'warn' },
+  COUNT_ADJUST_DOWN: { l: 'Ajuste −', tone: 'warn' },
+}
+const movLabel = (t: string) => MOV_LABEL[t] ?? { l: t, tone: 'neutral' as Tone }
+
+const DIVERG_CORES: Record<string, string> = {
+  FALTA: '#ef4444',
+  SOBRA: '#f97316',
+  AVARIA: '#a855f7',
+  VENCIDO: '#eab308',
+  TROCA: '#06b6d4',
+  DOCUMENTAL: '#64748b',
 }
 
 function Kpi({
   icon,
   label,
   value,
-  suffix,
-  delta,
+  to,
   tone = 'primary',
 }: {
   icon: ReactNode
   label: string
   value: string
-  suffix?: string
-  delta?: { v: string; up: boolean; good: boolean }
+  to: string
   tone?: string
 }) {
   const tones: Record<string, string> = {
@@ -77,29 +72,13 @@ function Kpi({
     info: 'bg-info-50 text-info',
   }
   return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between">
-        <div className={cn('h-9 w-9 rounded-xl grid place-items-center', tones[tone])}>{icon}</div>
-        {delta && (
-          <span
-            className={cn(
-              'flex items-center gap-0.5 text-xs font-medium',
-              delta.good ? 'text-ok' : 'text-bad',
-            )}
-          >
-            {delta.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            {delta.v}
-          </span>
-        )}
-      </div>
+    <Link to={to} className="card p-4 hover:border-brand transition-colors">
+      <div className={cn('h-9 w-9 rounded-xl grid place-items-center', tones[tone])}>{icon}</div>
       <div className="mt-3">
-        <div className="text-2xl font-semibold text-brand tracking-tight mono">
-          {value}
-          {suffix && <span className="text-base text-ink-muted font-normal ml-0.5">{suffix}</span>}
-        </div>
+        <div className="text-2xl font-semibold text-brand tracking-tight mono">{value}</div>
         <div className="text-xs text-ink-muted mt-0.5">{label}</div>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -115,57 +94,16 @@ function ChartCard({ title, action, children }: { title: string; action?: ReactN
   )
 }
 
-const tooltipStyle = {
-  borderRadius: 12,
-  border: '1px solid #e5e9f0',
-  boxShadow: '0 10px 30px -10px rgba(10,19,30,0.25)',
-  fontSize: 12,
-}
-
-function formatarNumero(valor: number) {
-  return valor.toLocaleString('pt-BR')
-}
-
-function formatarPercentual(valor: number) {
-  return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-}
-
-/**
- * KPIs REAIS do fluxo da viagem (06/07): chegadas/embarques em andamento,
- * cargas no piso e divergências abertas — direto do spoke. O resto do
- * dashboard segue demo até cada bloco ganhar fonte real.
- */
-function KpisReais() {
-  const conectado = isConnected()
-  const [kpis, setKpis] = useState<{ chegadas: number; embarques: number; piso: number; estouradas: number; diverg: number } | null>(null)
-
-  useEffect(() => {
-    if (!conectado) return
-    let vivo = true
-    Promise.all([
-      wmsApi.warehouseOverview('Recebimento em Piso').catch(() => []),
-      wmsApi.warehouseOverview('Carregamento').catch(() => []),
-      wmsApi.cargasEmPiso().catch(() => []),
-      wmsApi.divergences('ABERTA').catch(() => []),
-    ]).then(([rec, car, piso, div]) => {
-      if (!vivo) return
-      const abertas = (l: { status: string }[]) => l.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED').length
-      setKpis({
-        chegadas: abertas(rec),
-        embarques: abertas(car),
-        piso: piso.length,
-        estouradas: piso.filter((c) => c.estourou).length,
-        diverg: div.length,
-      })
-    })
-    return () => { vivo = false }
-  }, [conectado])
-
-  if (!conectado || !kpis) return null
+/** KPIs do fluxo da viagem — chegadas/embarques, piso e divergências. */
+function KpisFluxo({
+  kpis,
+}: {
+  kpis: { chegadas: number; embarques: number; piso: number; estouradas: number; diverg: number } | null
+}) {
+  if (!kpis) return null
   const cards = [
     { label: 'Chegadas em andamento', n: kpis.chegadas, to: '/recebimento', alerta: false },
     { label: 'Embarques em andamento', n: kpis.embarques, to: '/expedicao', alerta: false },
-    // Badge de alerta do free time (decisão 12 — 08/07): estourou → vermelho.
     {
       label: kpis.estouradas > 0 ? `Cargas no piso · ${kpis.estouradas} free time estourado` : 'Cargas no piso',
       n: kpis.piso,
@@ -177,7 +115,11 @@ function KpisReais() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {cards.map((c) => (
-        <Link key={c.label} to={c.to} className={`card p-3 hover:border-brand transition-colors ${c.alerta ? 'border-red-400' : ''}`}>
+        <Link
+          key={c.label}
+          to={c.to}
+          className={`card p-3 hover:border-brand transition-colors ${c.alerta ? 'border-red-400' : ''}`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">{c.n}</span>
             {c.alerta ? <Badge tone="bad">atenção</Badge> : <Badge tone="ok" dot>real</Badge>}
@@ -189,72 +131,111 @@ function KpisReais() {
   )
 }
 
+interface DashboardData {
+  kpis: { chegadas: number; embarques: number; piso: number; estouradas: number; diverg: number }
+  posicoes: number
+  volumes: number
+  palletsEmUso: number
+  autorizacoesPendentes: number
+  tarefasColetor: number
+  movimentos: WmsMovementDTO[]
+  divergPorTipo: { name: string; value: number; cor: string }[]
+  estoquePorZona: { zona: string; volumes: number; posicoes: number }[]
+}
+
 export default function Dashboard() {
-  const { tarefas, usuario, ownerId, recebimentos, estoque, pedidos, skusControle } = useStore()
-  const recebimentosFiltrados = useMemo(
-    () => recebimentos.filter((rec) => ownerId === 'own-all' || rec.ownerId === ownerId),
-    [ownerId, recebimentos],
-  )
-  const recebimentoPorId = useMemo(
-    () => new Map(recebimentos.map((rec) => [rec.id, rec])),
-    [recebimentos],
-  )
-  const pedidoPorId = useMemo(
-    () => new Map(pedidos.map((pedido) => [pedido.id, pedido])),
-    [pedidos],
-  )
-  const tarefasFiltradas = useMemo(
-    () =>
-      tarefas.filter((tarefa) => {
-        if (ownerId === 'own-all') return true
-        if (tarefa.referenciaTipo === 'recebimento' && tarefa.referenciaId) {
-          return recebimentoPorId.get(tarefa.referenciaId)?.ownerId === ownerId
-        }
-        if (tarefa.referenciaTipo === 'pedido' && tarefa.referenciaId) {
-          return pedidoPorId.get(tarefa.referenciaId)?.ownerId === ownerId
-        }
-        return true
-      }),
-    [ownerId, pedidoPorId, recebimentoPorId, tarefas],
-  )
-  const estoqueFiltrado = useMemo(
-    () => estoque.filter((posicao) => ownerId === 'own-all' || posicao.ownerId === ownerId),
-    [ownerId, estoque],
-  )
-  const viagensProntas = useMemo<ViagemComRecebimento[]>(
-    () =>
-      VIAGENS_ETIQUETAGEM.map((viagem) => ({
-        viagem,
-        recebimento: recebimentoPorId.get(viagem.recebimentoId) ?? null,
-      })).filter((row) => {
-        if (!row.recebimento) return false
-        if (ownerId !== 'own-all' && row.recebimento.ownerId !== ownerId) return false
-        if (skusPendentesDoRecebimento(row.recebimento, skusControle).length > 0) return false
-        if (row.viagem.documentoStatus !== 'aprovado') return false
-        if (row.viagem.ordemExecucaoAtual < 4) return false
-        if (row.recebimento.status === 'divergencia' || row.recebimento.itens.some((item) => item.ocorrencia)) return false
-        return true
-      }),
-    [ownerId, recebimentoPorId, skusControle],
-  )
-  const taxaOrdemExecucao = recebimentosFiltrados.length
-    ? (recebimentosFiltrados.filter((rec) => (rec.ordemExecucaoAtual ?? 0) > 0).length / recebimentosFiltrados.length) * 100
-    : 0
-  const etiquetasEmitidas = viagensProntas.reduce((total, row) => {
-    if (!row.recebimento) return total
-    return total + calcularEtiquetas(row.viagem, row.recebimento, emissaoAutomaticaIso(row)).length
-  }, 0)
-  const palletsNoEstoque = estoqueFiltrado.filter((posicao) => posicao.quantidade > 0).length
-  const palletsEnderecados = tarefasFiltradas.filter((tarefa) => tarefa.tipo === 'putaway' && tarefa.status === 'feito').length
-  const palletsCrossDocking = tarefasFiltradas.filter(
-    (tarefa) => tarefa.tipo === 'cross-docking' && tarefa.status !== 'feito',
-  ).length
-  const fila = tarefas.filter((t) => t.status !== 'feito').slice(0, 6)
+  const usuario = useStore((s) => s.usuario)
+  const [dados, setDados] = useState<DashboardData | null>(null)
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    if (!isConnected()) return
+    let vivo = true
+    Promise.all([
+      wmsApi.warehouseOverview('Recebimento em Piso').catch(() => []),
+      wmsApi.warehouseOverview('Carregamento').catch(() => []),
+      wmsApi.cargasEmPiso().catch(() => []),
+      wmsApi.divergences('ABERTA').catch(() => []),
+      wmsApi.stockPositions().catch(() => []),
+      wmsApi.pallets().catch(() => []),
+      wmsApi.autorizacoes('PENDENTE').catch(() => []),
+      wmsApi.warehouseTasks(['TMSGUARDAR', 'TMSABASTECER', 'TMSCONTAR', 'TMSSEPARAR']).catch(() => []),
+      wmsApi.movements(300).catch(() => []),
+    ]).then(([rec, car, piso, div, pos, pallets, auts, tarefas, movs]) => {
+      if (!vivo) return
+      const abertas = (l: { status: string }[]) =>
+        l.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED').length
+
+      const porTipoDiv = new Map<string, number>()
+      for (const d of div as { tipo: string }[]) {
+        porTipoDiv.set(d.tipo, (porTipoDiv.get(d.tipo) ?? 0) + 1)
+      }
+
+      const porZona = new Map<string, { volumes: number; posicoes: number }>()
+      for (const p of pos as { addressZone: string | null; quantity: number }[]) {
+        const z = p.addressZone ?? 'Sem zona'
+        const cur = porZona.get(z) ?? { volumes: 0, posicoes: 0 }
+        cur.volumes += p.quantity
+        cur.posicoes += 1
+        porZona.set(z, cur)
+      }
+
+      setDados({
+        kpis: {
+          chegadas: abertas(rec),
+          embarques: abertas(car),
+          piso: piso.length,
+          estouradas: (piso as { estourou?: boolean }[]).filter((c) => c.estourou).length,
+          diverg: div.length,
+        },
+        posicoes: pos.length,
+        volumes: (pos as { quantity: number }[]).reduce((s, p) => s + p.quantity, 0),
+        palletsEmUso: (pallets as { status: string }[]).filter((p) => p.status !== 'GUARDADO').length,
+        autorizacoesPendentes: auts.length,
+        tarefasColetor: tarefas.length,
+        movimentos: movs as WmsMovementDTO[],
+        divergPorTipo: [...porTipoDiv.entries()].map(([name, value]) => ({
+          name,
+          value,
+          cor: DIVERG_CORES[name] ?? '#94a3b8',
+        })),
+        estoquePorZona: [...porZona.entries()]
+          .map(([zona, v]) => ({ zona, ...v }))
+          .sort((a, b) => b.volumes - a.volumes),
+      })
+      setCarregando(false)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  // Fluxo de hoje por hora (movimentos reais: recebido × guardado × separado).
+  const fluxoHoje = useMemo(() => {
+    if (!dados) return []
+    const hoje = new Date().toDateString()
+    const porHora = new Map<number, { recebido: number; guardado: number; separado: number }>()
+    for (const m of dados.movimentos) {
+      const d = new Date(m.createdAt)
+      if (d.toDateString() !== hoje) continue
+      const h = d.getHours()
+      const cur = porHora.get(h) ?? { recebido: 0, guardado: 0, separado: 0 }
+      if (m.type === 'RECEIVE') cur.recebido += m.quantity
+      else if (m.type === 'PUTAWAY') cur.guardado += m.quantity
+      else if (m.type === 'PICK') cur.separado += m.quantity
+      porHora.set(h, cur)
+    }
+    const horas = [...porHora.keys()].sort((a, b) => a - b)
+    return horas.map((h) => ({ hora: `${String(h).padStart(2, '0')}h`, ...porHora.get(h)! }))
+  }, [dados])
+
+  const ultimosMovimentos = useMemo(() => (dados ? dados.movimentos.slice(0, 6) : []), [dados])
+  const maxZona = dados?.estoquePorZona[0]?.volumes ?? 0
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Bom dia, ${usuario.split(' ')[0] || 'Operador'}`}
+        title={`Bom dia, ${usuario.split(' ')[0]?.split('@')[0] || 'Operador'}`}
         subtitle={`Visão operacional do centro de distribuição · ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`}
       >
         <Link to="/recebimento" className="btn-outline">
@@ -265,125 +246,131 @@ export default function Dashboard() {
         </Link>
       </PageHeader>
 
-      <KpisReais />
+      {carregando ? (
+        <div className="card p-8 text-center text-sm text-ink-muted">Carregando dados do armazém…</div>
+      ) : (
+        <>
+          <KpisFluxo kpis={dados?.kpis ?? null} />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Kpi icon={<ClipboardCheck className="h-5 w-5" />} label="Operações com ordem de execução" value={formatarPercentual(taxaOrdemExecucao)} suffix="%" tone="ok" />
-        <Kpi icon={<Tags className="h-5 w-5" />} label="Etiquetas emitidas" value={formatarNumero(etiquetasEmitidas)} tone="accent" />
-        <Kpi icon={<Warehouse className="h-5 w-5" />} label="Pallets no estoque" value={formatarNumero(palletsNoEstoque)} tone="primary" />
-        <Kpi icon={<PackageCheck className="h-5 w-5" />} label="Pallets endereçados no armazém" value={formatarNumero(palletsEnderecados)} tone="info" />
-        <Kpi icon={<Shuffle className="h-5 w-5" />} label="Pallets em cross-docking" value={formatarNumero(palletsCrossDocking)} tone="warn" />
-      </div>
-
-      {/* charts row */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <ChartCard
-            title="Fluxo recebido vs. expedido (hoje)"
-            action={<Badge tone="primary" dot>Tempo real</Badge>}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={FLUXO_DIA} margin={{ left: -20, right: 4 }}>
-                <defs>
-                  <linearGradient id="gRec" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gExp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
-                <XAxis dataKey="hora" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" name="Recebido" dataKey="recebido" stroke="#2563eb" strokeWidth={2.5} fill="url(#gRec)" />
-                <Area type="monotone" name="Expedido" dataKey="expedido" stroke="#f97316" strokeWidth={2.5} fill="url(#gExp)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </div>
-
-        <ChartCard title="Status dos pedidos">
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie
-                data={STATUS_PEDIDOS}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={58}
-                outerRadius={88}
-                paddingAngle={2}
-              >
-                {STATUS_PEDIDOS.map((s) => (
-                  <Cell key={s.name} fill={s.cor} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        <ChartCard title="Ordens concluídas na semana">
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={ORDENS_EXECUCAO_SEMANA} margin={{ left: -20, right: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
-              <XAxis dataKey="dia" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f6f8fb' }} />
-              <Line type="monotone" dataKey="meta" stroke="#94a3b8" strokeDasharray="4 4" strokeWidth={2} dot={false} name="Meta" />
-              <Bar dataKey="ordens" fill="#2563eb" radius={[6, 6, 0, 0]} name="Realizado" barSize={26} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Ocupação por zona">
-          <div className="space-y-3.5 pt-1">
-            {OCUPACAO_ZONAS.map((z) => (
-              <div key={z.zona}>
-                <div className="flex items-center justify-between text-sm mb-1.5">
-                  <span className="text-ink-soft">{z.zona}</span>
-                  <span className="mono font-medium text-brand">{z.ocupacao}%</span>
-                </div>
-                <Progress value={z.ocupacao} tone={z.ocupacao > 90 ? 'bad' : z.ocupacao > 80 ? 'warn' : 'ok'} />
-              </div>
-            ))}
+          {/* KPIs de estoque/operacão — todos reais */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <Kpi icon={<Warehouse className="h-5 w-5" />} label="Posições ocupadas" value={String(dados?.posicoes ?? 0)} to="/estoque" tone="primary" />
+            <Kpi icon={<Boxes className="h-5 w-5" />} label="Volumes em estoque" value={(dados?.volumes ?? 0).toLocaleString('pt-BR')} to="/estoque" tone="info" />
+            <Kpi icon={<PackageCheck className="h-5 w-5" />} label="Pallets em uso" value={String(dados?.palletsEmUso ?? 0)} to="/pallets" tone="accent" />
+            <Kpi icon={<ShieldCheck className="h-5 w-5" />} label="Autorizações pendentes" value={String(dados?.autorizacoesPendentes ?? 0)} to="/expedicao" tone="warn" />
+            <Kpi icon={<ListChecks className="h-5 w-5" />} label="Tarefas do coletor" value={String(dados?.tarefasColetor ?? 0)} to="/os-viagem" tone="ok" />
           </div>
-        </ChartCard>
 
-        <ChartCard
-          title="Fila de tarefas ativa"
-          action={
-            <Link to="/tarefas" className="text-xs font-medium text-primary hover:underline">
-              Ver todas
-            </Link>
-          }
-        >
-          <div className="space-y-2">
-            {fila.map((t) => {
-              const meta = tipoTarefaLabel[t.tipo]
-              return (
-                <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line p-2.5 row-hover">
-                  <Badge tone={meta.tone}>{meta.l}</Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-ink-soft truncate">{t.descricao}</p>
-                    <p className="text-xs text-ink-muted mono">
-                      {t.origem} → {t.destino}
-                    </p>
-                  </div>
-                  {t.prioridade === 'alta' && <span className="h-2 w-2 rounded-full bg-bad" title="Prioridade alta" />}
-                </div>
-              )
-            })}
+          {/* Gráficos — movimentos reais */}
+          <div className="grid lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <ChartCard title="Movimentos de estoque hoje" action={<Badge tone="ok" dot>real</Badge>}>
+                {fluxoHoje.length === 0 ? (
+                  <p className="py-16 text-center text-xs text-ink-muted">Nenhum movimento de estoque registrado hoje.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={fluxoHoje} margin={{ left: -20, right: 4 }}>
+                      <defs>
+                        <linearGradient id="gRec" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gSep" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f97316" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
+                      <XAxis dataKey="hora" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                      <Area type="monotone" name="Recebido" dataKey="recebido" stroke="#2563eb" strokeWidth={2.5} fill="url(#gRec)" />
+                      <Area type="monotone" name="Guardado" dataKey="guardado" stroke="#0e7490" strokeWidth={2} fill="none" />
+                      <Area type="monotone" name="Separado" dataKey="separado" stroke="#f97316" strokeWidth={2.5} fill="url(#gSep)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+            </div>
+
+            <ChartCard title="Divergências abertas por tipo">
+              {(dados?.divergPorTipo.length ?? 0) === 0 ? (
+                <p className="py-16 text-center text-xs text-ink-muted">Nenhuma divergência aberta. 🎉</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={dados!.divergPorTipo} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={2}>
+                      {dados!.divergPorTipo.map((s) => (
+                        <Cell key={s.name} fill={s.cor} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
           </div>
-        </ChartCard>
-      </div>
+
+          <div className="grid lg:grid-cols-2 gap-4">
+            <ChartCard title="Estoque por zona">
+              {(dados?.estoquePorZona.length ?? 0) === 0 ? (
+                <p className="py-10 text-center text-xs text-ink-muted">Nenhuma posição de estoque ocupada.</p>
+              ) : (
+                <div className="space-y-3.5 pt-1">
+                  {dados!.estoquePorZona.map((z) => (
+                    <div key={z.zona}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="text-ink-soft">{z.zona}</span>
+                        <span className="mono font-medium text-brand">
+                          {z.volumes.toLocaleString('pt-BR')} vol · {z.posicoes} pos
+                        </span>
+                      </div>
+                      <Progress value={maxZona ? (z.volumes / maxZona) * 100 : 0} tone="ok" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ChartCard>
+
+            <ChartCard
+              title="Últimos movimentos"
+              action={
+                <Link to="/movimentos" className="text-xs font-medium text-primary hover:underline">
+                  Ver todos
+                </Link>
+              }
+            >
+              {ultimosMovimentos.length === 0 ? (
+                <p className="py-10 text-center text-xs text-ink-muted">Nenhum movimento registrado ainda.</p>
+              ) : (
+                <div className="space-y-2">
+                  {ultimosMovimentos.map((m) => {
+                    const meta = movLabel(m.type)
+                    return (
+                      <div key={m.id} className="flex items-center gap-3 rounded-xl border border-line p-2.5 row-hover">
+                        <Badge tone={meta.tone}>{meta.l}</Badge>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-ink-soft truncate">
+                            {m.quantity}× {m.skuCode} — {m.skuDescription}
+                          </p>
+                          <p className="text-xs text-ink-muted mono">
+                            {m.fromAddressCode ?? 'entrada'} → {m.toAddressCode ?? 'saída'}
+                          </p>
+                        </div>
+                        <span className="text-xs text-ink-muted mono shrink-0">
+                          {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </ChartCard>
+          </div>
+        </>
+      )}
     </div>
   )
 }
