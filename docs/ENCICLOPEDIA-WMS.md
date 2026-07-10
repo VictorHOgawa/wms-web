@@ -115,6 +115,11 @@ navegador em 09–10/07.
 ### Outras regras vivas
 - Free time: default 24h; por contrato via `freeTimeHoras` (generalidade).
 - Etiqueta de volume genérica **CARGA-VOLUME** para CT-e sem espelho de NF.
+- **Reemitir etiquetas do mesmo documento é barrado** (achado 10/07 — cliques
+  repetidos triplicavam lotes); reemissão só explícita. A emissão persiste lote
+  + códigos únicos, e a tela mostra os códigos gravados como prova.
+- Bloco de iscas na fila de Validações do GR só aparece quando a exigência está
+  **insuficiente**; "Revalidar GR" recarrega as divergências na tela.
 - Ordem de embarque por rota: **último a entregar sobe primeiro** (app e torre).
 - Capacidade de endereço: cada posição com saldo = 1 vaga de palete; consolidar o
   MESMO SKU/cliente não consome vaga nova; peso = quantidade × peso do SKU.
