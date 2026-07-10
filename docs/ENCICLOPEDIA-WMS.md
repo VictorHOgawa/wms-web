@@ -120,6 +120,14 @@ navegador em 09–10/07.
   MESMO SKU/cliente não consome vaga nova; peso = quantidade × peso do SKU.
 - Banco grava **UTC**; a api roda com `TZ=UTC` nos scripts de start (**nunca
   remover** — o fuso já mordeu uma vez na leitura).
+- **Parametrização é dado, não código** (princípio do admin): conferência cega,
+  estratégia de picking, free time etc. são chaves/valores que a operação lê —
+  a escala está em quais chaves se liga, não em versões do sistema.
+- **Permissão por AÇÃO, não por tela** (ex.: `quarentena.liberar`) — princípio a
+  seguir quando o RBAC (§6.1) for implementado.
+- **UX do coletor**: operador tem pouco tempo e baixa leitura — cor + ícone +
+  número grande, uma instrução por tela, botões gigantes, scan-to-confirm em
+  todo passo crítico; exceção se resolve dentro do fluxo.
 
 ---
 
@@ -216,7 +224,8 @@ histórico de antes da trava — dado honesto, não bug). O fixture
 ## 7. Ambiente — como rodar e gotchas
 
 - **Subir**: api `yarn start` (usa `TZ=UTC` — não remover); torre/admin `yarn dev`;
-  TMS `yarn dev`; app `npx expo start` (dev client).
+  TMS `yarn dev`; app `npx expo start` (dev client; QR no terminal — celular na
+  mesma rede Wi-Fi, ou `--tunnel`; `w` abre no navegador para teste rápido).
 - **Banco local**: postgres `localhost:5432/adapta_api`. Migrations: sempre
   `npx prisma migrate dev` no LOCAL (nunca contra produção). Com a api rodando no
   Windows, rodar `npx prisma generate` manualmente depois do migrate (o client
