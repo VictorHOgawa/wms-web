@@ -96,3 +96,57 @@ export function gerarZplEtiqueta(etiqueta: ZplEtiquetaInput, config: ZplPrinterC
 export function gerarZplLote(etiquetas: ZplEtiquetaInput[], config: ZplPrinterConfig) {
   return etiquetas.map((etiqueta) => gerarZplEtiqueta(etiqueta, config)).join('\n')
 }
+
+// ── Etiqueta IDENTITÁRIA (WmsEtiqueta) ──────────────────────────────────────
+// Layout próprio para o volume do WMS real: o que identifica o volume é o
+// CÓDIGO ÚNICO (Code128) — é ele que o coletor bipa na montagem de pallet,
+// conferência e carregamento. O ZplEtiquetaInput acima é o layout antigo de
+// etiqueta de transporte (viagem/NF/CT-e) e continua válido para aquele caso.
+
+export interface ZplIdentidadeInput {
+  /** Código único do volume (WmsEtiqueta.codigo) — vira o código de barras. */
+  codigo: string
+  skuCode: string
+  descricao: string
+  /** Nome do cliente (owner) da carga. */
+  cliente: string
+  /** CAIXA | UNIDADE */
+  tipoVolume: string
+  /** Posição no lote (1-based) e total, para conferência visual. */
+  seq: number
+  total: number
+}
+
+export function gerarZplIdentidade(et: ZplIdentidadeInput, config: ZplPrinterConfig) {
+  const width = mmToDots(config.widthMm, config.dpi)
+  const height = mmToDots(config.heightMm, config.dpi)
+  const dot = (mm: number) => mmToDots(mm, config.dpi)
+  const margem = dot(3)
+  const larguraUtil = width - margem * 2
+  const barcodeHeight = dot(Math.min(22, config.heightMm * 0.38))
+  const volume = et.tipoVolume === 'CAIXA' ? 'CAIXA MESTRE' : 'UNIDADE'
+
+  return [
+    '^XA',
+    '^CI28',
+    `^PW${width}`,
+    `^LL${height}`,
+    '^LH0,0',
+    `^FO0,0^GB${width},${height},2^FS`,
+    // Cliente + volume/seq no topo
+    `^FO${margem},${dot(2)}^A0N,${dot(2.6)},${dot(2.6)}^FB${larguraUtil - dot(24)},1,0,L^FD${normalizarTextoZpl(et.cliente)}^FS`,
+    `^FO${width - margem - dot(24)},${dot(2)}^A0N,${dot(2.6)},${dot(2.6)}^FB${dot(24)},1,0,R^FD${volume} ${et.seq}/${et.total}^FS`,
+    `^FO${margem},${dot(6)}^GB${larguraUtil},1,1^FS`,
+    // SKU em destaque + descrição
+    `^FO${margem},${dot(7.5)}^A0N,${dot(4.4)},${dot(4.4)}^FB${larguraUtil},1,0,L^FD${normalizarTextoZpl(et.skuCode)}^FS`,
+    `^FO${margem},${dot(12.5)}^A0N,${dot(2.2)},${dot(2.2)}^FB${larguraUtil},2,0,L^FD${normalizarTextoZpl(et.descricao)}^FS`,
+    // Código de barras central (Code128 do código único) + código legível
+    `^FO${margem},${dot(18.5)}^BY2,2,${barcodeHeight}^BCN,${barcodeHeight},N,N,N^FD${normalizarTextoZpl(et.codigo)}^FS`,
+    `^FO${margem},${height - dot(4.5)}^A0N,${dot(2.4)},${dot(2.4)}^FB${larguraUtil},1,0,C^FD${normalizarTextoZpl(et.codigo)}^FS`,
+    '^XZ',
+  ].join('\n')
+}
+
+export function gerarZplIdentidadesLote(itens: ZplIdentidadeInput[], config: ZplPrinterConfig) {
+  return itens.map((et) => gerarZplIdentidade(et, config)).join('\n')
+}

@@ -12,6 +12,9 @@ import {
 } from '../lib/wmsApi'
 import { Badge, EmptyState, PageHeader, type Tone } from '../components/ui'
 import { num } from '../lib/utils'
+import { useStore } from '../store/useStore'
+import { imprimirIdentidades } from '../lib/etiquetaPrint'
+import type { ZplIdentidadeInput } from '../lib/zpl'
 
 const TIPOS = [
   { v: 'QR_CODE', l: 'QR Code' },
@@ -41,6 +44,45 @@ export default function Etiquetar() {
   const [msg, setMsg] = useState<string | null>(null)
   const [identidades, setIdentidades] = useState<WmsEtiquetaIdentidadeDTO[]>([])
   const [loading, setLoading] = useState(conectado)
+  const [imprimindo, setImprimindo] = useState<string | null>(null)
+  const { zplPrinterConfig } = useStore()
+
+  // Impressão física (Zebra BrowserPrint; fallback = download do .zpl).
+  const montarInputs = (
+    ids: WmsEtiquetaIdentidadeDTO[],
+    descricao: string,
+    cliente: string,
+  ): ZplIdentidadeInput[] =>
+    ids.map((v, i) => ({
+      codigo: v.codigo,
+      skuCode: v.skuCode,
+      descricao,
+      cliente,
+      tipoVolume: v.tipoVolume,
+      seq: i + 1,
+      total: ids.length,
+    }))
+
+  const imprimir = async (chave: string, inputs: ZplIdentidadeInput[], arquivo: string) => {
+    if (imprimindo) return
+    setImprimindo(chave)
+    try {
+      const r = await imprimirIdentidades(inputs, zplPrinterConfig, arquivo)
+      setMsg(r.mensagem)
+    } finally {
+      setImprimindo(null)
+    }
+  }
+
+  const imprimirLote = async (l: WmsEtiquetaLoteDTO) => {
+    try {
+      const ids = await wmsApi.loteIdentidades(l.id)
+      const cliente = owners.find((o) => o.id === l.ownerId)?.nome ?? ''
+      await imprimir(l.id, montarInputs(ids, l.skuDescription ?? '', cliente), `etiquetas-${l.skuCode}.zpl`)
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Falha ao buscar as identidades do lote.')
+    }
+  }
 
   const refetch = async () => setLotes(await wmsApi.etiquetas())
   useEffect(() => {
@@ -177,9 +219,28 @@ export default function Etiquetar() {
 
           {identidades.length > 0 && (
             <div className="rounded-xl border border-line bg-surface-sub p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1.5">
-                Identidades geradas ({num(identidades.length)}) — 1 código único por volume · use na Montagem de Pallets
-              </p>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  Identidades geradas ({num(identidades.length)}) — 1 código único por volume · use na Montagem de Pallets
+                </p>
+                <button
+                  className="btn-outline shrink-0"
+                  disabled={imprimindo !== null}
+                  onClick={() =>
+                    imprimir(
+                      'emitidas',
+                      montarInputs(
+                        identidades,
+                        skus.find((s) => s.code === identidades[0]?.skuCode)?.description ?? '',
+                        owners.find((o) => o.id === ownerId)?.nome ?? '',
+                      ),
+                      `etiquetas-${identidades[0]?.skuCode ?? 'lote'}.zpl`,
+                    )
+                  }
+                >
+                  <Printer className="h-4 w-4" /> {imprimindo === 'emitidas' ? 'Imprimindo…' : 'Imprimir'}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {identidades.map((v) => (
                   <span key={v.id} className="mono text-[11px] rounded-md border border-line bg-surface px-1.5 py-0.5 text-ink-soft">
@@ -203,6 +264,7 @@ export default function Etiquetar() {
                 <th className="th text-right">Etiquetas</th>
                 <th className="th">Tipo</th>
                 <th className="th">Quando</th>
+                <th className="th" />
               </tr>
             </thead>
             <tbody>
@@ -217,6 +279,16 @@ export default function Etiquetar() {
                   <td className="td text-right mono font-medium text-brand">{num(l.nEtiquetas)}</td>
                   <td className="td"><Badge tone={TIPO_TONE[l.tipo] ?? 'neutral'}>{l.tipo}</Badge></td>
                   <td className="td text-xs text-ink-muted mono">{fmtDateTime(l.createdAt)}</td>
+                  <td className="td text-right">
+                    <button
+                      className="btn-outline"
+                      title="Imprimir as etiquetas deste lote (Zebra ou download do .zpl)"
+                      disabled={imprimindo !== null}
+                      onClick={() => imprimirLote(l)}
+                    >
+                      <Printer className="h-3.5 w-3.5" /> {imprimindo === l.id ? '…' : 'Imprimir'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -528,6 +528,8 @@ export interface WarehouseOverviewDTO {
   createdAt: string
   trip: { id: string; code: string; status: string } | null
   cd: { id: string; name: string } | null
+  /** Janela de serviço da parada (prioriza a fila de Separação). */
+  janela?: { inicio: string | null; fim: string | null } | null
   documentos: OverviewDocumentoDTO[]
   eventos: OverviewEventoDTO[]
   bloqueada: boolean

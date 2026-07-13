@@ -26,6 +26,9 @@ export default function Separacao() {
   const [estrategiaDefault, setEstrategiaDefault] = useState('FIFO')
   const [loading, setLoading] = useState(conectado)
   const [msg, setMsg] = useState<string | null>(null)
+  // Relógio da fila: snapshot no carregamento (fora do render — pureza do
+  // compilador React); a urgência da janela recalcula a cada recarga.
+  const [agoraFila, setAgoraFila] = useState(0)
 
   const carregar = async () => {
     try {
@@ -37,6 +40,7 @@ export default function Separacao() {
       setPosicoes(pos)
       setSeps(sp)
       setOsViagem(ov)
+      setAgoraFila(Date.now())
     } catch { /* mantém */ } finally { setLoading(false) }
   }
   useEffect(() => {
@@ -154,19 +158,30 @@ export default function Separacao() {
         </div>
       )}
 
-      {/* Separações que NASCEM DA VIAGEM (O.S do blueprint): lista + romaneio. */}
+      {/* Separações que NASCEM DA VIAGEM (O.S do blueprint): lista + romaneio.
+          Fila priorizada pela JANELA da parada (mais cedo primeiro; sem janela
+          vai pro fim) — a janela existia no roteiro e o armazém não a usava. */}
       {conectado && osViagem.filter((o) => o.status !== 'CANCELLED').length > 0 && (
         <div className="card overflow-hidden">
           <div className="px-4 py-2.5 border-b border-line text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Separações da viagem
+            Separações da viagem — priorizadas pela janela de carregamento
           </div>
           <div className="divide-y divide-line">
             {osViagem
               .filter((o) => o.status !== 'CANCELLED')
+              .sort((a, b) => {
+                const ja = a.janela?.inicio ?? a.janela?.fim
+                const jb = b.janela?.inicio ?? b.janela?.fim
+                if (ja && jb) return ja.localeCompare(jb)
+                if (ja) return -1
+                if (jb) return 1
+                return a.createdAt.localeCompare(b.createdAt)
+              })
               .map((os) => (
                 <SeparacaoViagem
                   key={os.serviceOrderId}
                   os={os}
+                  agora={agoraFila}
                   estrategiaDefault={estrategiaDefault}
                   onDone={(m) => { setMsg(m); void carregar() }}
                 />
@@ -224,10 +239,12 @@ export default function Separacao() {
 /** O.S "Separação" da viagem: lista de separação (estratégia) + romaneio. */
 function SeparacaoViagem({
   os,
+  agora,
   estrategiaDefault,
   onDone,
 }: {
   os: WarehouseOverviewDTO
+  agora: number
   estrategiaDefault: string
   onDone: (msg: string) => void
 }) {
@@ -267,6 +284,8 @@ function SeparacaoViagem({
           <span className="mono">{os.code}</span>
         </div>
       </div>
+
+      <JanelaBadge janela={os.janela} agora={agora} />
 
       {/* passos */}
       <span className="inline-flex items-center gap-1.5">
@@ -409,5 +428,29 @@ function LinhaPosicao({ pos, onGerar }: { pos: WmsStockPositionDTO; onGerar: (p:
         <Send className="h-4 w-4" /> Separar
       </button>
     </li>
+  )
+}
+
+/** Badge da janela de carregamento: estourada = vermelho, < 2h = âmbar.
+ *  `agora` é o snapshot do relógio tirado no carregamento da fila (pureza). */
+function JanelaBadge({
+  janela,
+  agora,
+}: {
+  janela?: { inicio: string | null; fim: string | null } | null
+  agora: number
+}) {
+  if (!janela || (!janela.inicio && !janela.fim)) return null
+  const fmt = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '—'
+  const ref = janela.fim ?? janela.inicio
+  const msAte = ref && agora > 0 ? new Date(ref).getTime() - agora : null
+  const tone: Tone = msAte != null && msAte < 0 ? 'bad' : msAte != null && msAte < 2 * 60 * 60 * 1000 ? 'warn' : 'info'
+  return (
+    <Badge tone={tone}>
+      <Clock className="h-3 w-3" /> janela {fmt(janela.inicio)} – {fmt(janela.fim)}
+    </Badge>
   )
 }
